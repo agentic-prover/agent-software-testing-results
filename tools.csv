@@ -1,0 +1,8 @@
+tool_id,name,url,reference,description
+klee,KLEE,https://github.com/klee/klee,https://www.usenix.org/conference/osdi-08/klee-unassisted-and-automatic-generation-high-coverage-tests-complex-systems,"A symbolic execution engine for LLVM bitcode. The entries run it under its symbolic-argument harness, with fixed options or with options sampled uniformly from SymTuner's parameter space."
+symtuner,SymTuner,https://github.com/skkusal/symtuner,https://doi.org/10.1145/3510003.3510185,"An independent tool that tunes KLEE's options adaptively. The entries run its artifact, ported to the study's KLEE build, under KLEE's symbolic-argument harness."
+aflpp,AFL++,https://github.com/AFLplusplus/AFLplusplus,https://www.usenix.org/conference/woot20/presentation/fioraldi,A coverage-guided fuzzer.
+symcc,SymCC,https://github.com/eurecom-s3/symcc,https://www.usenix.org/conference/usenixsecurity20/presentation/poeplau,"Compilation-based concolic execution, run here as a hybrid with a fuzzer."
+symsan,SymSan,,https://www.usenix.org/conference/usenixsecurity22/presentation/chen-ju,"Concolic execution based on dynamic data-flow analysis, run here as a hybrid with a fuzzer. The build is a reconstruction from the source of the artifact."
+concollmic,ConcoLLMic,https://github.com/ConcoLLMic/ConcoLLMic,https://doi.org/10.1109/SP63933.2026.00003,An agentic concolic executor.
+agolic,Agolic,,https://arxiv.org/abs/2608.06397,"An LLM agent that plans a campaign of short runs on a backend (KLEE, Direct-Input or AFL++) and chooses for each run its command-line arguments, inputs and seeds from the source code and the results so far."

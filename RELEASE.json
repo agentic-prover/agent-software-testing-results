@@ -1,0 +1,30 @@
+{
+  "name": "Agent Software Testing results",
+  "version": "0.1.0",
+  "date": "2026-11-02",
+  "release": "2026.1",
+  "previous_release": null,
+  "suite": null,
+  "specification": "0.1",
+  "programs_tag": null,
+  "schemas": {
+    "branch_set": "agent-software-testing/branch-set@0.1"
+  },
+  "public": true,
+  "licences": {
+    "data": "CC-BY-4.0",
+    "scripts": "Apache-2.0"
+  },
+  "citation": "Koh, Noller, Pasareanu and Sun, \"Agentic Planning for Symbolic Execution\", arXiv 2608.06397 (2026)",
+  "image": "0617e1767f9b99be3abd23e20f127f7e33f405cefdd2fb6452e06ade5643c580",
+  "runner": "agent-software-testing 0.1.0",
+  "profile": "standard",
+  "counts": {
+    "systems": 28,
+    "programs": 18,
+    "universes": 18,
+    "runs": 848,
+    "runs_with_branch_sets": 848,
+    "runs_with_curves": 848
+  }
+}

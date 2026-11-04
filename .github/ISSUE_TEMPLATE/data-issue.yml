@@ -1,0 +1,81 @@
+name: Data issue
+description: A number, label or file in a results release is wrong, missing or inconsistent.
+title: "Data: "
+labels: ["data"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for checking the data. A published release is never edited: a confirmed error is corrected in the next
+        release and listed in its errata. Please do not describe bugs of the programs here (`DISCLOSURE.md`), and
+        do not paste personal data or local paths.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong
+      options:
+        - A number (covered, total, a median, an overlap count)
+        - A label or description (system, program, measure, track, budget, cores)
+        - A run that is missing, duplicated or in the wrong place
+        - A file that is malformed or fails `scripts/check.py`
+        - A sanitiser count
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: release
+    attributes:
+      label: Release
+      description: The version in `RELEASE.json` that you looked at.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: File and row
+      description: The file, and the row or key, where you found it.
+      placeholder: "runs.csv, row for system klee-fixed-6w, program gzip, repeat 2"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System id (if it concerns one)
+  - type: input
+    id: program
+    attributes:
+      label: Program (if it concerns one)
+  - type: textarea
+    id: description
+    attributes:
+      label: What is wrong, and what you expected
+      description: State the value you found, the value you expected, and why.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: How you checked
+      description: |
+        The commands you ran, or your own replay (runner version, image, output). If you replayed a submitted bundle
+        yourself, give its SHA-256.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested correction (optional)
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reproduced the problem on an unmodified copy of the release.
+          required: true
+        - label: I searched the existing issues and the errata.
+          required: true
+        - label: This report contains no details of unfixed bugs of one of the programs, and no personal data.
+          required: true

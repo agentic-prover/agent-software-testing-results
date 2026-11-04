@@ -1,0 +1,269 @@
+# Replays the test cases of a submission pull request on the free GitHub-hosted runners.
+#
+# Read docs/REPLAY-WORKFLOW.md before changing anything here. The security rules of this file:
+#  * pull_request_target, so that this file and scripts/replay_job.py always come from the default branch.
+#  * Nothing from the pull request is checked out or run. The manifest is read as data through the API.
+#  * Values from the pull request reach scripts only through environment variables, after they were checked.
+#  * The replay jobs hold no secrets and run only after a person approved the environment "replay".
+#  * Only the last job may write to the pull request. It reads artifacts as untrusted text.
+#  * Logs and artifacts hold branch identities, counts and kinds only. Program output goes to files that are never uploaded.
+name: Replay submission
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+    paths:
+      - "submissions/*.json"
+      - "!submissions/schema.json"
+      - "!submissions/example.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: replay-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  # Reads and checks the manifest. Runs without approval and executes nothing from the submission.
+  prepare:
+    name: Read the manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      ok: ${{ steps.prepare.outputs.ok }}
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      programs: ${{ steps.prepare.outputs.programs }}
+    steps:
+      - name: Check out the default branch (never the pull request)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read and check the manifest
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          OUT_DIR: ${{ runner.temp }}/prepare
+        run: python3 scripts/replay_job.py prepare
+      - name: Keep the plan
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: prepare
+          path: ${{ runner.temp }}/prepare
+          overwrite: true
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # A person approves here once. Set required reviewers on the environment "replay" (Settings, Environments).
+  # The replay jobs below wait for this job, so they stay pending until then.
+  approve:
+    name: Wait for approval
+    needs: prepare
+    if: needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: replay
+    steps:
+      - run: echo "A maintainer approved the replay."
+
+  # Stage 1: coverage replay, one job per program and repeat.
+  coverage:
+    name: Coverage ${{ matrix.run.name }}
+    needs: [prepare, approve]
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        run: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read the pinned image and runner
+        id: pins
+        run: python3 scripts/replay_job.py pins
+      - name: Check out the pinned runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ steps.pins.outputs.runner_repository }}
+          ref: ${{ steps.pins.outputs.runner_ref }}
+          path: runner
+          persist-credentials: false
+      - name: Get the plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: prepare
+          path: ${{ runner.temp }}/plan
+      - name: Replay
+        env:
+          STAGE: coverage
+          PLAN_FILE: ${{ runner.temp }}/plan/plan.json
+          RUN_INDEX: ${{ matrix.run.index }}
+          IMAGE: ${{ steps.pins.outputs.image }}
+          CR_DIR: ${{ github.workspace }}/runner
+          WORK_DIR: ${{ runner.temp }}/work
+          RESULT_DIR: ${{ runner.temp }}/result
+          DATA_DIR: ${{ runner.temp }}/data
+          JOB_BUDGET_S: "20400"
+        run: python3 scripts/replay_job.py run
+      - name: Make sure there is a result
+        if: always()
+        env:
+          STAGE: coverage
+          RUN_NAME: ${{ matrix.run.name }}
+          RESULT_DIR: ${{ runner.temp }}/result
+          JOB_STATUS: ${{ job.status }}
+        run: python3 scripts/replay_job.py finish
+      - name: Upload the state of this run
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: result-coverage-${{ matrix.run.name }}
+          path: ${{ runner.temp }}/result
+          overwrite: true
+          retention-days: 30
+          if-no-files-found: ignore
+      - name: Upload the results for ingest
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: data-coverage-${{ matrix.run.name }}
+          path: ${{ runner.temp }}/data
+          overwrite: true
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # Stage 2: sanitiser pass, one job per program. A job takes the repeats of its program one after the other, so that a
+  # signature is counted once over the repeats on the runner. Starts only when every job of stage 1 passed.
+  sanitiser:
+    name: Sanitiser ${{ matrix.prog.name }}
+    needs: [prepare, approve, coverage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        prog: ${{ fromJSON(needs.prepare.outputs.programs) }}
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read the pinned image and runner
+        id: pins
+        run: python3 scripts/replay_job.py pins
+      - name: Check out the pinned runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ steps.pins.outputs.runner_repository }}
+          ref: ${{ steps.pins.outputs.runner_ref }}
+          path: runner
+          persist-credentials: false
+      - name: Get the plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: prepare
+          path: ${{ runner.temp }}/plan
+      - name: Count signatures over all repeats
+        env:
+          STAGE: signatures
+          PLAN_FILE: ${{ runner.temp }}/plan/plan.json
+          PROGRAM: ${{ matrix.prog.name }}
+          IMAGE: ${{ steps.pins.outputs.image }}
+          CR_DIR: ${{ github.workspace }}/runner
+          WORK_DIR: ${{ runner.temp }}/work
+          RESULT_DIR: ${{ runner.temp }}/result
+          DATA_DIR: ${{ runner.temp }}/data
+          JOB_BUDGET_S: "20400"
+        run: python3 scripts/replay_job.py run
+      - name: Make sure there is a result
+        if: always()
+        env:
+          STAGE: signatures
+          RUN_NAME: ${{ matrix.prog.name }}
+          RESULT_DIR: ${{ runner.temp }}/result
+          JOB_STATUS: ${{ job.status }}
+        run: python3 scripts/replay_job.py finish
+      - name: Upload the state of this run
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: result-signatures-${{ matrix.prog.name }}
+          path: ${{ runner.temp }}/result
+          overwrite: true
+          retention-days: 30
+          if-no-files-found: ignore
+      - name: Upload the counts and rows for ingest
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: data-signatures-${{ matrix.prog.name }}
+          path: ${{ runner.temp }}/data
+          overwrite: true
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # The only job that writes to the pull request. It runs nothing from the submission.
+  summary:
+    name: Summary comment
+    needs: [prepare, approve, coverage, sanitiser]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Get the plan record
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: prepare
+          path: ${{ runner.temp }}/artifacts/prepare
+      - name: Get the state files of all runs
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: "result-*"
+          path: ${{ runner.temp }}/artifacts
+      - name: Post or update the comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ARTIFACT_DIR: ${{ runner.temp }}/artifacts
+          NEEDS_PREPARE: ${{ needs.prepare.result }}
+          NEEDS_APPROVE: ${{ needs.approve.result }}
+          NEEDS_COVERAGE: ${{ needs.coverage.result }}
+          NEEDS_SANITISER: ${{ needs.sanitiser.result }}
+        run: python3 scripts/replay_job.py comment

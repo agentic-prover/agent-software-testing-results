@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-software-testing/submission@0.1",
+  "title": "Submission manifest (submissions/<system_id>.json)",
+  "description": "One manifest describes one system: one tool, in one version and configuration, on one track, with one budget. It lists the bundles (one per program and repeat) that were submitted for it. It is checked for structure only. Rules this schema cannot express and that the maintainers check: every (program, repeat) pair occurs once; the bundles' own tool.json agree with this manifest (tool name, version, family, model, track, budget); every bundle hash matches the downloaded archive; each program has repeats 1, 2 and 3 or the system is marked incomplete.",
+  "type": "object",
+  "required": ["schema", "tool", "track", "budget", "hardware", "bundles", "contact_handle", "consent"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "agent-software-testing/submission@0.1" },
+    "system_id": {
+      "description": "The id the system has in systems.csv. Absent in a draft; the maintainers set it when the submission is accepted, and it is the name of the manifest file.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "maxLength": 100
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version", "url", "licence", "family"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "version": {
+          "description": "The release, tag or commit that was run.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "url": {
+          "description": "Where the tool, or a description of it, can be found.",
+          "type": "string",
+          "pattern": "^https?://\\S+$"
+        },
+        "licence": {
+          "description": "SPDX identifier or expression of the tool's licence, or 'proprietary' or 'unknown'.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "family": { "enum": ["symbolic", "fuzzer", "hybrid", "llm", "agent", "other"] },
+        "model": {
+          "description": "Name and version of the language model, for tools that use one; null otherwise.",
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "config_sha256": {
+          "description": "SHA-256 of a file that holds the tool's configuration, if it has one (the same value as tool.config_sha256 in the bundles).",
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }]
+        }
+      }
+    },
+    "track": {
+      "description": "fixed: the program's fixed invocation is given and the tool supplies only the input. open: the tool chooses arguments, files, standard input and environment. A submission has one track.",
+      "enum": ["fixed", "open"]
+    },
+    "budget": {
+      "type": "object",
+      "required": ["wall_s", "cores"],
+      "additionalProperties": false,
+      "properties": {
+        "wall_s": { "description": "Wall-clock seconds of one campaign.", "type": "integer", "minimum": 1, "maximum": 604800 },
+        "cores": { "description": "CPU cores the tool used at the same time.", "type": "integer", "minimum": 1 },
+        "notes": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "hardware": {
+      "description": "The machine the campaigns ran on, as the submitter reports it.",
+      "type": "object",
+      "required": ["cpu", "memory_gib"],
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "description": "Processor model or class, and the number of cores of the machine.", "type": "string", "minLength": 1, "maxLength": 200 },
+        "memory_gib": { "type": "number", "exclusiveMinimum": 0 },
+        "gpu": { "description": "Accelerator model, or null if none was used.", "type": ["string", "null"], "maxLength": 200 },
+        "notes": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "tokens": {
+      "description": "Language-model tokens of one whole campaign, as the provider's interface reported them (reasoning tokens counted as output), for tools that use a model; the median over the submitted repeats if they differ. Null for tools without a model. Per-run values belong in each bundle's tool.json (resources).",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": { "type": ["integer", "null"], "minimum": 0 },
+            "output_tokens": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "bundles": {
+      "description": "The submitted bundles: one entry per program and repeat.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["program", "repeat", "doi_or_url", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "program": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "repeat": { "type": "integer", "minimum": 1 },
+          "doi_or_url": {
+            "description": "A DOI (10.xxxx/...) or an HTTPS address of the archive. A DOI is preferred; an address is accepted only for immutable files, which the hash pins.",
+            "type": "string",
+            "pattern": "^(10\\.[0-9]{4,9}/\\S+|https://\\S+)$"
+          },
+          "sha256": { "description": "SHA-256 of the archive file at doi_or_url.", "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "contact_handle": {
+      "description": "A GitHub handle (without '@') of the person or account to ask about this submission. It is published; no email address or name is stored in the repository.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"
+    },
+    "consent": {
+      "description": "The submitter agrees that the measurements derived from the bundles, together with the tool's name, version and the self-reported resources, are published under CC BY 4.0.",
+      "type": "object",
+      "required": ["publish_under_cc_by_4_0"],
+      "additionalProperties": false,
+      "properties": {
+        "publish_under_cc_by_4_0": { "const": true }
+      }
+    },
+    "notes": { "type": "string", "maxLength": 4000 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

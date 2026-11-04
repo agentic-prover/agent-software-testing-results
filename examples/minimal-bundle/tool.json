@@ -1,0 +1,22 @@
+{
+  "schema": "agent-software-testing/tool@0.1",
+  "tool": {
+    "name": "example-generator",
+    "version": null,
+    "family": "other",
+    "model": null,
+    "config_sha256": null,
+    "url": null
+  },
+  "program": {
+    "id": "gzip",
+    "source_sha256": "01a7b881bd220bfdf615f97b8718f80bdfd3f6add385b993dcf6efd14e8c0ac6"
+  },
+  "track": "open",
+  "repeat": 1,
+  "budget": {
+    "wall_s": 21600,
+    "cores": 1
+  },
+  "notes": "the smallest bundle the validator accepts: two cases, one with an argument and one with standard input"
+}

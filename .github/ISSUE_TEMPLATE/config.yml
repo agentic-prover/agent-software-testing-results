@@ -1,0 +1,15 @@
+# Issue chooser for the agent-software-testing-results repository.
+blank_issues_enabled: false
+contact_links:
+  - name: Submit results for your tool
+    url: https://github.com/agentic-prover/agent-software-testing-results/blob/HEAD/docs/SUBMITTING.md
+    about: A submission is a pull request that adds submissions/<system_id>.json. See docs/SUBMITTING.md.
+  - name: Report a bug found in one of the 18 programs (private)
+    url: https://github.com/agentic-prover/agent-software-testing-results/security/advisories/new
+    about: Crashes, sanitiser findings and other bugs of the 18 programs are reported privately, never in an issue. See DISCLOSURE.md.
+  - name: Problem with the runner, the specification or a program definition
+    url: https://github.com/agentic-prover/agent-software-testing/issues/new/choose
+    about: The standard is in the agent-software-testing repository.
+  - name: Problem with the website
+    url: https://github.com/agentic-prover/agent-software-testing-site/issues/new/choose
+    about: The site is generated from this repository by agent-software-testing-site.

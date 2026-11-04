@@ -1,0 +1,19 @@
+program,name,version,branch_total,inputs,source_url,fixed_track
+bc,bc,1.08.2,1922,argv;files;stdin;env,https://ftp.gnu.org/gnu/bc/bc-1.08.2.tar.gz,
+confetti,Confetti,1.0.0-beta.4,632,stdin,https://github.com/hgs3/confetti/releases/download/v1.0.0-beta.4/confetti-1.0.0-beta.4.tar.gz,stdin
+diff,diff,3.12,4369,argv;files;stdin;env,https://ftp.gnu.org/gnu/diffutils/diffutils-3.12.tar.xz,
+du,du,9.11,7331,argv;files;stdin;env,https://ftp.gnu.org/gnu/coreutils/coreutils-9.11.tar.xz,
+gawk,gawk,5.4.1,20356,argv;files;stdin;env,https://ftp.gnu.org/gnu/gawk/gawk-5.4.1.tar.xz,
+gcal,gcal,4.2.0,15632,argv;files;stdin;env,https://www.alteholz.dev/gnu/gcal-4.2.0.tar.xz,
+grep,grep,3.12,4806,argv;files;stdin;env,https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz,
+gzip,gzip,1.14,3083,argv;files;stdin;env,https://ftp.gnu.org/gnu/gzip/gzip-1.14.tar.xz,
+jq,jq,1.8.2,18280,argv;files;stdin;env,https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz,
+krep,Krep,1.2,1231,argv;files,https://github.com/davidesantangelo/krep/archive/9c4d41ce92f4e9ef6dc786eaf0e5be488153c4b4.tar.gz,test {input}
+libmatheval,Libmatheval,1.1.11,591,stdin,https://ftp.gnu.org/gnu/libmatheval/libmatheval-1.1.11.tar.gz,stdin
+libyaml,LibYAML,0.2.5,4275,stdin,https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz,stdin
+ls,ls,9.11,4441,argv;files;stdin;env,https://ftp.gnu.org/gnu/coreutils/coreutils-9.11.tar.xz,
+oggenc,Oggenc,1.4.3,1138,argv;files,https://github.com/xiph/vorbis-tools/archive/235540c05ad3f9cdc673ca09c237c9a9b5bda6eb.tar.gz,{input}
+sed,sed,4.10,6958,argv;files;stdin;env,https://ftp.gnu.org/gnu/sed/sed-4.10.tar.xz,
+woff2,WOFF2,1.0.2,11412,files,https://github.com/google/woff2/archive/0f4d304faa1c62994536dc73510305c7357da8d4.tar.gz,{input}
+xmlwf,xmlwf,2.8.2,6293,argv;files;stdin;env,https://github.com/libexpat/libexpat/releases/download/R_2_8_2/expat-2.8.2.tar.xz,
+xorriso,xorriso,1.5.8.pl02,54607,argv;files;stdin;env,https://ftp.gnu.org/gnu/xorriso/xorriso-1.5.8.pl02.tar.gz,

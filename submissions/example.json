@@ -1,0 +1,37 @@
+{
+  "schema": "agent-software-testing/submission@0.1",
+  "tool": {
+    "name": "example-generator",
+    "version": "1.0",
+    "url": "https://example.org/example-generator",
+    "licence": "Apache-2.0",
+    "family": "fuzzer",
+    "model": null
+  },
+  "track": "open",
+  "budget": { "wall_s": 21600, "cores": 1, "notes": "one process per campaign" },
+  "hardware": { "cpu": "64-core x86-64 server", "memory_gib": 256, "gpu": null },
+  "tokens": null,
+  "bundles": [
+    {
+      "program": "gzip",
+      "repeat": 1,
+      "doi_or_url": "10.0000/example-gzip-r1",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "program": "gzip",
+      "repeat": 2,
+      "doi_or_url": "10.0000/example-gzip-r2",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "program": "gzip",
+      "repeat": 3,
+      "doi_or_url": "10.0000/example-gzip-r3",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "contact_handle": "example-handle",
+  "consent": { "publish_under_cc_by_4_0": true }
+}
