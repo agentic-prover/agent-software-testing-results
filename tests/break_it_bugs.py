@@ -53,7 +53,7 @@ BUGS = [
     ('W-f', J, 'if size > max_bytes:', 'if False:', 'a download has no size limit'),
     ('W-g', J, 'if "setup_error_example" in doc:', 'if False:', 'the text of a failed case stays in the public record'),
     ('W-h', J, 'if sig.get("kind") not in add_signatures.KIND_SPELLING:', 'if False:', 'an unknown kind is not reported as such'),
-    ('W-i', J, '"errors": [clean(e, 300) for e in errors[:8]]', '"errors": errors[:8]', 'a huge manifest error makes the report unreadable'),
+    ('W-i', J, '"errors": [str(e)[:300] for e in errors[:8]]', '"errors": errors[:8]', 'a huge manifest error makes the report unreadable'),
     ('W-j', J, 'if re.fullmatch(r"[0-9a-f]{40}", commit):', 'if commit:', 'the comment prints what it was given as a commit'),
     ('W-k', J, '"--memory", "14g", "--memory-swap", "14g", ', '', 'the container has no memory bound'),
     ('W-l', J, '    if status >= 300:\n        raise OSError(f"GitHub refused the comment (status {status})")\n    return "created"', '    return "created"', 'a refused comment reads as a success'),

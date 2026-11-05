@@ -17,8 +17,9 @@ only when a maintainer merges; `.github/workflows/publish.yml` then adds them an
 3. **Pin the image and the runner.** Edit `.github/replay-pins.json`. Set `image` to the line
    from the run summary and `runner_ref` to the full commit of the runner repository that should do the replay. Until
    both are set every submission fails at once with a message that the setup is not finished.
-4. **Serve the website from this repository.** Open Settings, then Pages, and set the source to GitHub Actions. The
-   custom domain goes there too. No stored secret is needed: each job uses the short-lived permissions GitHub gives it.
+4. **Serve the website from this repository.** Open Settings, then Pages. Set the source to Deploy from a branch with
+   `main` and `/ (root)`, press Save, then set it to GitHub Actions, because the second setting alone does not create the
+   site. The custom domain goes there too. No stored secret is needed: each job uses the short-lived permissions GitHub gives it.
 5. **Allow the workflows' trigger.** From 2 December 2026 GitHub blocks `pull_request_target` in public repositories
    unless a policy allows it, and without it nothing starts when a pull request is opened. Open Settings, then under
    Actions choose Policies and create a policy for `.github/workflows/replay.yml` and `.github/workflows/publish.yml`
