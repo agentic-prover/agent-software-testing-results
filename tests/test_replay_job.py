@@ -215,6 +215,19 @@ class PrepareChecks(unittest.TestCase):
         self.assertTrue(record["ok"])
         self.assertEqual(record["incomplete"], ["gzip"])
 
+    def test_a_submission_may_change_nothing_but_its_manifest(self):
+        extras = [{"filename": "scripts/check.py", "status": "modified"},
+                  {"filename": ".github/workflows/publish.yml", "status": "added"},
+                  {"filename": "README.md", "status": "removed"},
+                  {"filename": "submissions/new-name.json", "status": "renamed", "previous_filename": "scripts/derive.py"}]
+        for extra in extras[:3]:
+            self.files = [{"filename": "submissions/mytool.json", "status": "added"}, extra]
+            record = self.run_prepare()
+            self.assertEqual(self.codes(record), ["other_files"], extra)
+            self.assertFalse(record["ok"])
+        self.files = [extras[3]]
+        self.assertEqual(self.codes(self.run_prepare()), ["other_files"])
+
     def test_a_published_system_name_is_refused(self):
         root = make_root(Path(self._tmp.name) / "taken")
         (root / "systems.csv").write_text("system_id,label\nmytool,Example\n")

@@ -40,6 +40,8 @@ BUGS = [
     ("U3-a", U, 'return rj.clean(value or "", limit) or rj.clean(fallback, limit)', 'return str(value or fallback)[:limit]', "notes reach the tables uncleaned"),
     ("U3-b", U, """parts = [f"{rj.clean(tool['name'], 80)} {rj.clean(tool['version'], 40)}"]""", """parts = [f"{tool['name']} {tool['version']}"]""", "a tool name reaches the label uncleaned"),
     ("U4-a", U, 'if named is None or named in {s["system_id"] for s in read_table(root / "systems.csv")[1]}:', 'if named is None:', "a change to a published manifest tries a new release"),
+    ("U6-a", J, 'if every_file - set(candidates):', 'if False:', "a submission can carry code along"),
+    ("U6-b", J, 'every_file.update(f["filename"] for f in files if isinstance(f, dict) and isinstance(f.get("filename"), str))', 'every_file.update(names)', "a file a pull request deletes or changes is not noticed"),
     ("U4-b", J, 'if stem in published_systems(root):', 'if False:', "a published name can be submitted again"),
     ("U5-a", U, 'if not token:\n            print("SITE_REBUILD_TOKEN', 'if False:\n            print("SITE_REBUILD_TOKEN', "no token still calls GitHub"),
     ('W-a', J, 'if not value.startswith("https://"):', 'if False:', 'a link that is not https is accepted'),

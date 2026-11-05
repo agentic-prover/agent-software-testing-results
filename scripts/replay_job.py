@@ -115,6 +115,8 @@ MESSAGES: dict[str, Callable[[dict], str]] = {
         + clean(p.get("detail", "")) + ". Fix the file and push again.",
     "manifest_invalid": lambda p: "The manifest does not follow submissions/schema.json. Problems found: "
         + "; ".join(manifest_error(e) for e in p.get("errors", [])) + ". Fix them and push again.",
+    "other_files": lambda p: f"A submission changes only its manifest, and this pull request also changes "
+        f"{int(p.get('count', 0))} other file(s). Take them out, or send them in a pull request of their own, and push again.",
     "system_taken": lambda p: f"A published system is already called {code_span(p.get('system', ''))}. Rename the manifest "
         "(a new version of a tool is a new system) and push again.",
     "program_unknown": lambda p: f"Program {clean(p.get('program'), 60)} is not one of the programs in programs.csv. "
@@ -341,6 +343,7 @@ def prepare(api: Callable, repo: str, pr: int, head_sha: str, head_repo: str, ro
         record["problems"].append({"code": "github_unavailable"})
         return record
     names: list[str] = []
+    every_file: set[str] = set()
     page = 1
     while page <= 30:
         status, body = api_retry(api, "GET", f"/repos/{repo}/pulls/{pr}/files?per_page=100&page={page}", sleep=sleep)
@@ -351,6 +354,8 @@ def prepare(api: Callable, repo: str, pr: int, head_sha: str, head_repo: str, ro
             files = json.loads(body)
         except ValueError:
             files = []
+        every_file.update(f["filename"] for f in files if isinstance(f, dict) and isinstance(f.get("filename"), str))
+        every_file.update(f["previous_filename"] for f in files if isinstance(f, dict) and isinstance(f.get("previous_filename"), str))
         names += [f["filename"] for f in files if isinstance(f, dict) and isinstance(f.get("filename"), str)
                   and f.get("status") in ("added", "modified", "renamed", "changed", "copied")]
         if len(files) < 100:
@@ -363,6 +368,9 @@ def prepare(api: Callable, repo: str, pr: int, head_sha: str, head_repo: str, ro
         return record
     if len(candidates) > 1:
         record["problems"].append({"code": "several_manifests"})
+        return record
+    if every_file - set(candidates):
+        record["problems"].append({"code": "other_files", "count": len(every_file - set(candidates))})
         return record
     stem = candidates[0][len("submissions/"):-len(".json")]
     if not NAME_RE.match(stem) or len(stem) > 100:

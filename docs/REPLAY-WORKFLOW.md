@@ -58,6 +58,7 @@ A new push to the pull request cancels the running workflow and starts a new one
 | The manifest or form details are wrong | The file does not follow the schema or a name or link is not allowed | Nothing for the maintainer. The submitter fixes the file and pushes. |
 | Download failed (names the link) | Three tries failed | Check the link. If the host was down, re-run the failed jobs later. |
 | Checksum mismatch | The file is not the one the manifest names | The submitter fixes the link or the hash. |
+| A submission changes only its manifest | The pull request also changes other files | The submitter takes them out. |
 | A published system is already called this | The name of the manifest is taken | The submitter renames the file. |
 | Bundle invalid or does not match the manifest | The validator or the comparison with the manifest said no | The submitter fixes the bundle and the hash. |
 | Too big for the disk | The archive or the unpacked bundle does not fit the free runner | The submitter makes the bundle smaller. |

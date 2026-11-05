@@ -59,6 +59,7 @@ Changes the R2 tests make, each on a copy of the release.
 | U2 | What it publishes is the next release, passes the full check and states what a reader must know about a run. | `TestPublished`, `test_the_full_check_stops...`, `test_a_system_with_too_few...`, `test_next_release` |
 | U3 | Text from a manifest cannot write Markdown or HTML into the tables, and a name inside an artifact reaches nothing. | `test_text_from_a_manifest...`, `test_a_name_inside_an_artifact...` |
 | U4 | A change to a manifest that is already published makes no release, and a published name cannot be submitted again. | `test_a_change_to_a_published_manifest...`, `test_a_published_system_name_is_refused` |
+| U6 | A pull request that changes anything beside its one manifest gets no replay, so it cannot be published with code in it. | `test_a_submission_may_change_nothing_but_its_manifest` |
 | U5 | The site rebuild starts only from a release and never without its token, and the workflow never checks out the pull request. | `test_the_site_rebuild_needs_its_token...`, `test_the_workflow_runs_only_after_a_merge...` |
 | I1 | An import gives back exactly the runs that were replayed. It carries nothing of the machine they ran on. The release it leaves passes the check. | `test_an_import_gives_back_exactly...` |
 | I2 | Tables that disagree with each other or with the release are refused before a file is changed. | `test_tables_that_disagree...`, `test_a_file_that_changed_after...` |
