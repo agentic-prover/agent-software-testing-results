@@ -23,7 +23,7 @@
   "tokens": null,
   "bundles": [
     {
-      "program": "gzip",
+      "program": "no-such-program",
       "repeat": 1,
       "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/11f43364d91ca040048ee367bcbe98e0aeb750e8/tryout-gzip-open-r1.tar.gz",
       "sha256": "3e78647b070de7c35e3cff0bd20a131b9bfed029681fc2eb79193e5e30a9ec25"
@@ -31,7 +31,7 @@
     {
       "program": "gzip",
       "repeat": 2,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/11f43364d91ca040048ee367bcbe98e0aeb750e8/tryout-gzip-open-r2.tar.gz",
+      "doi_or_url": "http://example.org/not-https.tar.gz",
       "sha256": "2f3ef058734694e224ce71131aeaa329f13ab52ce1e881a0aa1101cf6bf48bba"
     },
     {
@@ -43,7 +43,7 @@
   ],
   "contact_handle": "dannkoh",
   "consent": {
-    "publish_under_cc_by_4_0": true
+    "publish_under_cc_by_4_0": false
   },
   "notes": "A trial of the submission workflow with a made-up test generator. Not to be merged."
 }
