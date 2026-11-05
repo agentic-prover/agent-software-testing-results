@@ -1266,8 +1266,9 @@ def cmd_comment() -> int:
         preview = read_small_json(artifacts / "preview" / "preview.json")
     except (OSError, ValueError, RecursionError):
         preview = None
-    if isinstance(preview, dict) and os.environ.get("NEEDS_PREVIEW_DEPLOY") != "success":
-        preview["url"] = ""
+    if isinstance(preview, dict):
+        page = os.environ.get("PAGE_URL", "")
+        preview["url"] = page.rstrip("/") + "/preview/" if page else ""
     body, ok = build_comment(record, results, needs, os.environ["RUN_URL"], os.environ.get("HEAD_SHA", ""), preview)
     api = github_api(os.environ["GH_TOKEN"], os.environ.get("GITHUB_API_URL", "https://api.github.com"))
     log_line("summary comment " + post_comment(api, os.environ["REPO"], env_int("PR_NUMBER"), body))

@@ -3,7 +3,7 @@
 # Copyright 2026 The Agent Software Testing authors
 """Add the results of a replayed submission to the data.
 
-    python3 scripts/publish_submission.py candidate   needs PLAN_FILE, DATA_DIR, OUT_FILE, PREVIEW_URL
+    python3 scripts/publish_submission.py candidate   needs PLAN_FILE, DATA_DIR, OUT_FILE
     python3 scripts/publish_submission.py publish     needs GH_TOKEN, REPO, PR_NUMBER, HEAD_SHA, SUBMITTED
     python3 scripts/publish_submission.py withdraw    needs SYSTEM_ID
 
@@ -426,7 +426,6 @@ def main(argv: list[str]) -> int:
     today = datetime.datetime.now(datetime.timezone.utc).date()
     if command == "candidate":
         record = candidate(Path(os.environ["PLAN_FILE"]), Path(os.environ["DATA_DIR"]), today)
-        record["url"] = os.environ.get("PREVIEW_URL", "")
         Path(os.environ["OUT_FILE"]).write_text(json.dumps(record), encoding="utf-8")
         print("candidate:", "ok" if record["ok"] else record["problem"])
         return 0 if record["ok"] else 1

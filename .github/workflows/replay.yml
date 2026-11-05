@@ -234,7 +234,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      pages: read
     outputs:
       built_from: ${{ steps.main.outputs.commit }}
     steps:
@@ -254,8 +253,6 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.12"
-      - id: pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - name: Get the plan
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
@@ -274,22 +271,19 @@ jobs:
           PLAN_FILE: ${{ runner.temp }}/plan/plan.json
           DATA_DIR: ${{ runner.temp }}/data
           OUT_FILE: ${{ runner.temp }}/preview/preview.json
-          PREVIEW_URL: ${{ steps.pages.outputs.base_url }}/preview/
         run: |
           mkdir -p "$(dirname "$OUT_FILE")"
           cp -R results candidate
           python3 candidate/scripts/publish_submission.py candidate
       - name: Build and check both
-        env:
-          BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          BASE_URL: ${{ steps.pages.outputs.base_url }}
-        run: python site/scripts/pages_build.py results "$RUNNER_TEMP/site-out" --base-path "$BASE_PATH/" --site-url "$BASE_URL/" --preview candidate
+        run: python site/scripts/pages_build.py results "$RUNNER_TEMP/site-out" --preview candidate
       - name: Say that the website does not build
         if: failure()
         env:
           OUT_FILE: ${{ runner.temp }}/preview/preview.json
         run: |
           [ -f "$OUT_FILE" ] && grep -q '"ok": false' "$OUT_FILE" && exit 0
+          mkdir -p "$(dirname "$OUT_FILE")"
           echo '{"ok": false, "flags": [], "problem": "The website does not build or pass its checks with this submission.", "url": ""}' > "$OUT_FILE"
       - name: Keep what the comment needs
         if: always()
@@ -317,6 +311,8 @@ jobs:
     concurrency:
       group: pages
       cancel-in-progress: false
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Stop if the main branch moved, so that the site never goes back
         env:
@@ -325,7 +321,8 @@ jobs:
         run: |
           now=$(git ls-remote "$REPOSITORY" refs/heads/main | cut -f1)
           [ "$now" = "$BUILT_FROM" ] || { echo "The main branch moved while the preview was built."; exit 1; }
-      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   # The only job that writes to the pull request. It runs nothing from the submission.
   summary:
@@ -373,5 +370,5 @@ jobs:
           NEEDS_APPROVE: ${{ needs.approve.result }}
           NEEDS_COVERAGE: ${{ needs.coverage.result }}
           NEEDS_SANITISER: ${{ needs.sanitiser.result }}
-          NEEDS_PREVIEW_DEPLOY: ${{ needs.preview-deploy.result }}
+          PAGE_URL: ${{ needs.preview-deploy.outputs.page_url }}
         run: python3 scripts/replay_job.py comment

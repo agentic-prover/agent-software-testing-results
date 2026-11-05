@@ -71,7 +71,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      pages: read
     steps:
       - name: Check out the data
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -89,13 +88,8 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.12"
-      - id: pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - name: Build and check
-        env:
-          BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          BASE_URL: ${{ steps.pages.outputs.base_url }}
-        run: python site/scripts/pages_build.py results "$RUNNER_TEMP/site-out" --base-path "$BASE_PATH/" --site-url "$BASE_URL/"
+        run: python site/scripts/pages_build.py results "$RUNNER_TEMP/site-out"
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: ${{ runner.temp }}/site-out
