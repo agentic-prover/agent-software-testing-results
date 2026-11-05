@@ -91,6 +91,15 @@ def code_span(link: str) -> str:
     return "`" + re.sub(r"[^A-Za-z0-9._~:/?=%+@,-]", "", str(link))[:MAX_LINK] + "`"
 
 
+def manifest_error(text: Any) -> str:
+    """One problem of a manifest for the comment: where it is, as code, and what is wrong, in plain words."""
+    address, _, problem = str(text).partition(": ")
+    address = re.sub(r"\[(\d+)\]", r".\1", address).removeprefix("$").removeprefix(".")
+    if problem.startswith("does not match"):
+        problem = "is not in the form that submissions/schema.json asks for"
+    return f"{code_span(address) if address else 'The file'}: {clean(problem)}"
+
+
 MESSAGES: dict[str, Callable[[dict], str]] = {
     "pins_missing": lambda p: "The replay setup is not finished. The pinned image or runner version is missing in "
         ".github/replay-pins.json. This is not caused by your submission. A maintainer needs to fix it, then close and reopen this pull request.",
@@ -105,7 +114,9 @@ MESSAGES: dict[str, Callable[[dict], str]] = {
     "manifest_unreadable": lambda p: "The manifest is not valid JSON or is too large (limit 1 MiB). Detail: "
         + clean(p.get("detail", "")) + ". Fix the file and push again.",
     "manifest_invalid": lambda p: "The manifest does not follow submissions/schema.json. Problems found: "
-        + "; ".join(clean(e) for e in p.get("errors", [])) + ". Fix them and push again.",
+        + "; ".join(manifest_error(e) for e in p.get("errors", [])) + ". Fix them and push again.",
+    "system_taken": lambda p: f"A published system is already called {code_span(p.get('system', ''))}. Rename the manifest "
+        "(a new version of a tool is a new system) and push again.",
     "program_unknown": lambda p: f"Program {clean(p.get('program'), 60)} is not one of the programs in programs.csv. "
         "Use the program ids of that file.",
     "duplicate_run": lambda p: f"Program {clean(p.get('program'), 60)}, repeat {clean(p.get('repeat'), 10)} is listed more "
@@ -123,8 +134,7 @@ MESSAGES: dict[str, Callable[[dict], str]] = {
         f"{int(p.get('attempts', DOWNLOAD_ATTEMPTS))} tries. Check that the link works without logging in. If the host "
         "was down, a maintainer can re-run the failed jobs later.",
     "checksum_mismatch": lambda p: f"The archive at {code_span(p.get('link', ''))} has a SHA-256 "
-        f"that starts with {clean(str(p.get('got', ''))[:12], 12)} while the manifest gives one that starts with "
-        f"{clean(str(p.get('expected', ''))[:12], 12)}. Check that the link "
+        f"of {code_span(p.get('got', ''))} while the manifest gives {code_span(p.get('expected', ''))}. Check that the link "
         "points to the right file and that the hash in the manifest is of the archive (the .tar.gz), then push again.",
     "too_big_download": lambda p: f"The archive at {code_span(p.get('link', ''))} is too big for the free runner "
         f"({clean(p.get('size_gb'), 10)} GB; at most {clean(p.get('limit_gb'), 10)} GB fits on its disk next to the "
@@ -213,6 +223,14 @@ def read_pins(root: Path = ROOT) -> dict:
     return {"image": image, "runner_ref": ref, "runner_repository": repo}
 
 
+def published_systems(root: Path = ROOT) -> set[str]:
+    path = root / "systems.csv"
+    if not path.is_file():
+        return set()
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {row["system_id"] for row in csv.DictReader(handle)}
+
+
 def known_programs(root: Path = ROOT) -> set[str]:
     try:
         with open(root / "programs.csv", newline="", encoding="utf-8") as handle:
@@ -227,7 +245,7 @@ def check_manifest(document: Any, stem: str, programs: set[str], schema: dict | 
     problems: list[dict] = []
     errors = validate_manifest.validate(document, schema)
     if errors:
-        return [{"code": "manifest_invalid", "errors": [clean(e, 300) for e in errors[:8]]}]
+        return [{"code": "manifest_invalid", "errors": [str(e)[:300] for e in errors[:8]]}]
     if document.get("system_id", stem) != stem:
         problems.append({"code": "manifest_name"})
     bundles = document["bundles"]
@@ -369,6 +387,8 @@ def prepare(api: Callable, repo: str, pr: int, head_sha: str, head_repo: str, ro
         record["problems"].append({"code": "manifest_unreadable", "detail": type(exc).__name__ + ": " + str(exc)[:100]})
         return record
     problems = check_manifest(document, stem, known_programs(root))
+    if stem in published_systems(root):
+        problems.append({"code": "system_taken", "system": stem})
     record["system_id"] = stem
     if problems:
         record["problems"] = problems
@@ -975,6 +995,10 @@ def findings_text(rows: list[dict]) -> str:
     return ", ".join(parts) if parts else "none"
 
 
+def flake_words(count: int) -> str:
+    return "1 branch differs" if count == 1 else f"{count} branches differ"
+
+
 def cases_text(cov: dict) -> str:
     """How many cases were replayed, and how many of them gave no full measurement."""
     parts = [f"{cov[key]} {label}" for key, label in (("timeouts", "timed out"), ("not_started", "did not start"))
@@ -1036,7 +1060,7 @@ def build_comment(prepare_record: dict | None, results: dict, needs: dict, run_u
             state = "passed"
             covered_text = f"{cov.get('covered', '?')} / {cov.get('total', '?')}"
             cases_shown = cases_text(cov)
-            flake_text = "not checked" if cov.get("flake") is None else f"{cov['flake']} branches differ"
+            flake_text = "not checked" if cov.get("flake") is None else flake_words(cov["flake"])
         lines.append(f"| {name} | {state} | {covered_text} | {cases_shown} | {flake_text} |")
         if cov and cov["state"] != STATE_PASSED:
             explain.append(f"- **{name}, coverage replay.** {message(cov['code'] or 'lost', cov.get('params'))}")

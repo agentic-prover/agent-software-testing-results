@@ -373,7 +373,7 @@ def main():
         for col in ("label", "backend", "description", "reference"):
             if not s[col]:
                 err(f"systems.csv: {s['system_id']} empty {col}")
-        if not re.match(r"^[a-z0-9][a-z0-9.+-]*$", s["system_id"]):
+        if not re.match(r"^[a-z0-9][a-z0-9.+_-]*$", s["system_id"]):
             err(f"systems.csv: odd system_id {s['system_id']}")
     rel = json.loads((ROOT / "RELEASE.json").read_text())
     n_unknown = check_identity(systems, tables["tools.csv"], rel)

@@ -184,7 +184,7 @@ cases that crash the program or send the submission when that period is over.
 ### 6. Open a pull request
 
 The pull request is the submission. Fork this repository, add one file `submissions/<system_id>.json` and open a pull
-request. Choose the `system_id` yourself from lower-case letters, digits, hyphens and underscores. The file is the
+request. Choose the `system_id` yourself from lower-case letters, digits, hyphens and underscores, and do not reuse one that `systems.csv` lists. The file is the
 manifest of [`submissions/schema.json`](../submissions/schema.json) (see [`submissions/README.md`](../submissions/README.md)).
 It holds
 
@@ -207,57 +207,16 @@ SHA-256 with the manifest, validates the bundle and replays it with the flake ch
 replays have passed. One comment on the pull request shows the state of every run. If a run fails, the comment says what
 failed and what to do. A test case that crashes a program is normal and does not fail a run.
 
-### 7. What the maintainers do
+### 7. Publication
 
-These are the steps a maintainer takes for an accepted submission. The commands assume a checkout of this repository,
-next to the runner checkout (the checks look for a directory named `agent-software-testing` beside this one) and Python 3.10 or
-later.
+A maintainer reads the result and merges the pull request. The merge publishes the submission. A workflow takes the
+results of the replay of the merged commit, adds them to the data, runs the full check, makes a new release and rebuilds
+the website. The pull request says when that is done, or why it stopped. Nothing else is needed from you or from the
+maintainers.
 
-1. **Approve the replay.** Read the manifest and the links in the pull request. Then approve the `replay`
-   environment of the workflow run. The workflow is described in [REPLAY-WORKFLOW.md](REPLAY-WORKFLOW.md). It never
-   pushes to the repository.
-
-2. **Check the result.** The comment on the pull request gives the final counts, the replay noise and the sanitiser kinds
-   and counts. Each run keeps its results as artifacts of the workflow run for 30 days.
-
-3. **Ingest the replay output.** For each run:
-
-   * `coverage-branches.json` → `sets/<system_id>/<program>/r<N>.json.gz` (gzip it; the check reads the compressed
-     file);
-   * `timeline.csv` → `curves/<system_id>/<program>/r<N>.csv` (the 900 s checkpoints of the standard profile);
-   * append one row to `runs.csv` with the columns of its header: `covered` and `total` from `replay.json`, the
-     `measure` (`standard` for the reference runner's default profile), the two paths above, the output tokens where a
-     model was used and notes. A program with fewer than three repeats carries the note `incomplete`; a run with no
-     branch set has no `set_path`, the measure `published` and a note saying `no branch set held`. A curve that falls
-     between two checkpoints by more than 10 branches needs a note `curve dips by up to N branches` and a maintainer's
-     decision. Only ConcoLLMic runs carry a `standard replay driver <8 hex digits>` note;
-   * add the system's sanitiser counts of each program with
-     `python3 scripts/add_signatures.py <system_id> <program> --rows signature-rows.csv`, using the file from the
-     artifact `data-signatures-<program>`. The workflow counted each signature once over the repeats on its runner;
-     the script checks the file and refuses when `derived/signatures.csv` already has rows for that system and program;
-   * add one row to `systems.csv` if the system is new: `system_id` (lowercase, from `[a-z0-9.+-]`),
-     `label`, `family`, `backend`, `model`, `cores`, `budget_s`, `track`, `group` (`main`, `ablation`, `seeding` or
-     `control`; a new tool's own result is `main`), `description`, `reference`, `tool_id`, `version`, `config` (a label or `unknown`), `config_sha256` (empty, `unknown` or 64
-     lowercase hex digits), `submitted` (YYYY-MM-DD), `first_release` (the current release name), `status`
-     (`current`, `superseded` or `withdrawn`) and `supersedes`. `label`, `backend`, `description` and `reference` must not be empty (a tool with no paper gives its address as `reference`, and a `label` names a budget other than six hours, for example `Tryout, 2 cores, 1 h`); use `other` for a backend that none of the existing values describes. The `measure` column is the
-     `+`-joined list of the measures of the system's runs, in the order `canonical`, `standard`, `common-observer`,
-     `published`;
-   * add a row to `tools.csv` if the tool is new: `tool_id`, `name`, `url`, `reference`, `description`. `url` and `reference` are empty or an https address.
-
-4. **Regenerate and check.** Run `python3 scripts/derive.py` (it rewrites `derived/` and the systems table in
-   `README.md`), then update the six counts in `RELEASE.json` (`systems`, `programs`, `universes`, `runs`,
-   `runs_with_branch_sets`, `runs_with_curves`).
-
-   Run `python3 scripts/check.py`; it must print `all checks passed`. `check.py` also validates every manifest in
-   `submissions/` against `submissions/schema.json` and the release version/date shape.
-
-5. **Merge.** Merge the submission pull request once its replay has passed, then add the runs, the system and tool
-   rows and the regenerated files in a follow-up pull request that leaves the manifest as it is, because any change to a
-   submission pull request starts its replay again. The submitter can review the result there. Say so if something is
-   wrong or unclear. A maintainer merges when `check.py` passes.
-
-6. **Release.** When it is merged, the runs are in the next release (`RELEASE.json`), which gets a version, checksums
-   and a DOI. Cite that release when you refer to the numbers.
+The system is listed with the name, version, family, budget and notes of your manifest, so write them as you want them
+to be read. A new version of a tool is a new system with a manifest of its own. For a correction later, open a pull
+request or a Data issue.
 
 ## Rules
 

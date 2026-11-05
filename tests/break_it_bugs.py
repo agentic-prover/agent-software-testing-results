@@ -14,9 +14,11 @@ A = "scripts/add_signatures.py"
 V = "scripts/validate_manifest.py"
 P = "scripts/package_inputs.py"
 J = "scripts/replay_job.py"
+U = "scripts/publish_submission.py"
 
 # the test files that can notice a bug in a script (the others do not run it, directly or through another script)
 TESTS_FOR = {
+    U: ["tests/test_publish_submission.py"],
     C: ["tests/test_release_check.py", "tests/test_import_replay.py", "tests/test_derive.py"],
     D: ["tests/test_derive.py", "tests/test_release_check.py", "tests/test_import_replay.py"],
     I: ["tests/test_import_replay.py", "tests/test_add_signatures.py", "tests/test_release_check.py"],
@@ -27,6 +29,19 @@ TESTS_FOR = {
 }
 
 BUGS = [
+    ("U1-a", U, 'isinstance(r, dict) and r.get("conclusion") == "success"]', 'isinstance(r, dict)]', "a failed replay counts as passed"),
+    ("U1-b", U, 'if plan.get("pr") == pr and plan.get("head_sha") == head_sha:', 'if plan.get("pr") == pr:', "a replay of another commit counts"),
+    ("U1-c", U, 'if plan.get("pr") == pr and plan.get("head_sha") == head_sha:', 'if plan.get("head_sha") == head_sha:', "a replay of another pull request counts"),
+    ("U1-d", U, 'if wanted != planned or plan.get("system_id") != stem:', 'if plan.get("system_id") != stem:', "the manifest may list other runs than were replayed"),
+    ("U2-a", U, '    run_script(root, "check.py")\n    return name, version', '    return name, version', "the new tree is not checked"),
+    ("U2-b", U, 'if len(repeats_of[program]) < 3:', 'if len(repeats_of[program]) < 1:', "too few repeats are not marked"),
+    ("U2-c", U, 'previous_release=release["release"]', 'previous_release=None', "the release forgets the one before it"),
+    ("U2-d", U, '"covered_branch_keys": keys}', '"covered_branch_keys": keys, **{k: v for k, v in coverage.items() if k == "extra"}}', "fields the release does not define get into a set"),
+    ("U3-a", U, 'return rj.clean(value or "", limit) or rj.clean(fallback, limit)', 'return str(value or fallback)[:limit]', "notes reach the tables uncleaned"),
+    ("U3-b", U, """parts = [f"{rj.clean(tool['name'], 80)} {rj.clean(tool['version'], 40)}"]""", """parts = [f"{tool['name']} {tool['version']}"]""", "a tool name reaches the label uncleaned"),
+    ("U4-a", U, 'if named is None or named in {s["system_id"] for s in read_table(root / "systems.csv")[1]}:', 'if named is None:', "a change to a published manifest tries a new release"),
+    ("U4-b", J, 'if stem in published_systems(root):', 'if False:', "a published name can be submitted again"),
+    ("U5-a", U, 'if not token:\n            print("SITE_REBUILD_TOKEN', 'if False:\n            print("SITE_REBUILD_TOKEN', "no token still calls GitHub"),
     ('W-a', J, 'if not value.startswith("https://"):', 'if False:', 'a link that is not https is accepted'),
     ('W-b', J, 'if last.isdigit() or last.startswith("0x"):', 'if False:', 'an address written as one number passes as a host name'),
     ('W-c', J, 'all(ipaddress.ip_address(item[4][0]).is_global for item in found)', 'True', "a host name may lead to the runner's own network"),

@@ -1,0 +1,73 @@
+# Publishes a submission when a maintainer merges it: adds the results of its passed replay to the data, makes a new
+# release and starts the site's rebuild. Read docs/REPLAY-WORKFLOW.md before changing anything here.
+#  * pull_request_target, so that this file and the scripts come from the default branch. Nothing from the pull request
+#    is checked out or run.
+#  * The results are read as data from the artifacts of the replay of exactly the merged commit.
+#  * If a check fails nothing is pushed and the pull request says why.
+name: Publish submission
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+    paths:
+      - "submissions/*.json"
+      - "!submissions/schema.json"
+      - "!submissions/example.json"
+  # Starts the site's rebuild alone, for a change on the site or to try the token.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-submission
+  cancel-in-progress: false
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  publish:
+    name: Add the results and make a release
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Check out the main branch (never the pull request)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SUBMITTED: ${{ github.event.pull_request.created_at }}
+        run: python3 scripts/publish_submission.py publish
+
+  site:
+    name: Start the site's rebuild
+    needs: publish
+    if: ${{ !cancelled() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the main branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Start it
+        env:
+          SITE_TOKEN: ${{ secrets.SITE_REBUILD_TOKEN }}
+          SITE_REPO: ${{ github.repository_owner }}/agent-software-testing-site
+        run: python3 scripts/publish_submission.py rebuild-site

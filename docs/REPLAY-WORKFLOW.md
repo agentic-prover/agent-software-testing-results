@@ -2,7 +2,8 @@
 
 A pull request that adds `submissions/<system_id>.json` is a submission. The workflow in `.github/workflows/replay.yml`
 reads the manifest, waits for a maintainer to approve, replays every listed bundle on free GitHub runners and posts one
-comment on the pull request. It never pushes to the repository. Results enter the data only when a maintainer merges.
+comment on the pull request. It never pushes to the repository. Results enter the data only when a maintainer merges;
+`.github/workflows/publish.yml` then adds them and makes a release.
 
 ## Settings to change once
 
@@ -11,11 +12,16 @@ comment on the pull request. It never pushes to the repository. Results enter th
    only gate. The manifest job runs at once on every pull request. Everything that replays waits for this approval.
 2. **Publish the replay image.** In the runner repository open Actions, choose "Build replay image" and run it. It
    compiles all 18 programs, so allow about an hour. The run summary shows the image name with its digest and the
-   size. Open the package in GitHub Container Registry and check that it is public, because the replay jobs hold no
+   size. A new package comes out private. Open its settings and make it public, because the replay jobs hold no
    secrets and pull it anonymously.
 3. **Pin the image and the runner.** Edit `.github/replay-pins.json`. Set `image` to the line
    from the run summary and `runner_ref` to the full commit of the runner repository that should do the replay. Until
    both are set every submission fails at once with a message that the setup is not finished.
+4. **Let a release start the site's rebuild.** Create a fine-grained token that can reach only the repository
+   `agent-software-testing-site`, with the permission Actions set to read and write. Save it in this repository under
+   Settings, Secrets and variables, Actions, as `SITE_REBUILD_TOKEN`. To try it, open Actions here, choose "Publish
+   submission" and run it. Without the token a release still happens, and the workflow "Rebuild the site" of the site
+   repository has to be run by hand.
 
 The workflow file and `scripts/replay_job.py` always come from the default branch. A pull request cannot change them
 for its own run. Changes to either go through review like any other change.
@@ -37,6 +43,7 @@ for its own run. Changes to either go through review like any other change.
    signature once over the repeats, on the runner.
 5. The last job writes or updates one comment with a table of every run and, for each failure, what failed and
    what to do. It fails when any run failed. The pull request then stays red.
+6. A maintainer reads the result and merges. See [What the merge does](#what-the-merge-does).
 
 A new push to the pull request cancels the running workflow and starts a new one that needs approval again.
 
@@ -47,6 +54,7 @@ A new push to the pull request cancels the running workflow and starts a new one
 | The manifest or form details are wrong | The file does not follow the schema or a name or link is not allowed | Nothing for the maintainer. The submitter fixes the file and pushes. |
 | Download failed (names the link) | Three tries failed | Check the link. If the host was down, re-run the failed jobs later. |
 | Checksum mismatch | The file is not the one the manifest names | The submitter fixes the link or the hash. |
+| A published system is already called this | The name of the manifest is taken | The submitter renames the file. |
 | Bundle invalid or does not match the manifest | The validator or the comparison with the manifest said no | The submitter fixes the bundle and the hash. |
 | Too big for the disk | The archive or the unpacked bundle does not fit the free runner | The submitter makes the bundle smaller. |
 | Reached the job limit | A run needed more than about 5 hours 40 minutes | The submitter sends fewer cases. A paid runner is a decision for the owners. |
@@ -65,27 +73,28 @@ job of the new attempt. GitHub may ask for approval of the environment again.
 A re-run uses the scripts and the pins of the commit the run started from. After a change to the scripts or to
 `.github/replay-pins.json`, close and reopen the pull request instead: that starts a new run, which needs approval again.
 
-## What to take for ingest
+## What the merge does
 
-Every run uploads artifacts to the workflow run, kept for 30 days.
+Merging a submission starts `.github/workflows/publish.yml`. It runs only after a merge, from the default branch, and it
+runs nothing from the submission. It does this:
 
-* `data-coverage-<program>-r<N>` holds `replay.json`, `timeline.csv` and `coverage-branches.json`. Two free-text
-  fields of `replay.json` (`setup_error_example` and the list of case ids under `timeouts`) are emptied before upload.
-* `data-signatures-<program>` holds `signature-rows.csv` and one `signatures-counts-r<N>.json` for each repeat. The
-  rows have the columns of `derived/signatures.csv` and already count each signature once over the repeats.
+1. It finds a passed replay of exactly the merged commit. There must be one, and its plan must name this pull request.
+2. It reads the artifacts as data. `data-coverage-<program>-r<N>` gives the branch set, the curve and the counts of a run.
+   `data-signatures-<program>` gives the sanitiser kinds and counts. The details of signatures (frames, examples and case
+   ids) never leave the runner of the replay, and two free-text fields of `replay.json` are emptied before upload.
+3. It adds the runs to `sets/`, `curves/` and `runs.csv` and the system to `systems.csv`, and the tool to `tools.csv` if it
+   is new. A program with fewer than three repeats carries the note `incomplete` and a falling curve states its fall. The
+   name, version, family, budget and notes come from the manifest. The backend is `other`, the group `main` and the
+   configuration `unknown`, so a maintainer who knows better corrects them in a later pull request.
+4. It runs `scripts/derive.py`, updates `RELEASE.json` to the next release and runs `scripts/check.py`.
+5. If that passes it commits, tags the release `v<version>` and pushes both, and starts the site's rebuild. The site's
+   workflow builds from the new release, checks the build and commits `docs/`.
 
-The details of the signatures (frames, examples and case ids) never leave the runner. For the sanitiser counts of a
-program run
+If any step fails nothing is pushed and a comment on the pull request says why. Fix the cause and re-run the job from the
+Actions tab. A change to a manifest that is already published does not make a release.
 
-```
-python3 scripts/add_signatures.py <system_id> <program> --rows signature-rows.csv
-```
-
-The script checks the columns, the sanitisers, the kinds and the counts of the file. It refuses when
-`derived/signatures.csv` already has rows for that system and program. If a kind is missing from `KIND_SPELLING` the job
-fails with a message that a maintainer must add the kind. Add it to `scripts/import_replay.py` and `scripts/check.py`, then close and reopen the pull request.
-
-The `result-*` artifacts hold the state of each run and are what the comment is built from.
+Artifacts stay for 30 days. A merge after that says so on the pull request. Open a new pull request that changes the
+manifest, a note is enough, and its replay and its merge publish the submission.
 
 ## Limits
 
@@ -96,7 +105,7 @@ The `result-*` artifacts hold the state of each run and are what the comment is 
   that does not fit.
 * DOIs work for Zenodo records that hold one file. Any other link must be a direct https address without
   ampersands, semicolons or spaces.
-* Artifacts count against the storage of the account. They are kept for 30 days.
+* Artifacts count against the storage of the account. They are kept for 30 days, so merge within that time.
 
 ## Safety in short
 

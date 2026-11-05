@@ -215,6 +215,12 @@ class PrepareChecks(unittest.TestCase):
         self.assertTrue(record["ok"])
         self.assertEqual(record["incomplete"], ["gzip"])
 
+    def test_a_published_system_name_is_refused(self):
+        root = make_root(Path(self._tmp.name) / "taken")
+        (root / "systems.csv").write_text("system_id,label\nmytool,Example\n")
+        record = self.run_prepare(root=root)
+        self.assertEqual(self.codes(record), ["system_taken"])
+
     def test_missing_pins(self):
         record = self.run_prepare(root=make_root(Path(self._tmp.name) / "other", pins=False))
         self.assertEqual(self.codes(record), ["pins_missing"])
@@ -475,8 +481,7 @@ class StageChecks(unittest.TestCase):
         self.assertEqual(result["code"], "checksum_mismatch")
         text = rj.message(result["code"], result["params"])
         self.assertNotIn("....", text)
-        self.assertEqual(text.count(self.run_entry["sha256"][:12]), 1)
-        self.assertNotIn(self.run_entry["sha256"][:13], text)
+        self.assertEqual(text.count(self.run_entry["sha256"]), 1)
 
     def test_archive_problems(self):
         self.assertEqual(self.stage(archive=b"junk" * 50)["code"], "archive_unreadable")
@@ -638,6 +643,33 @@ class CommentChecks(unittest.TestCase):
         text, ok = rj.build_comment(record, {}, {}, "u")
         self.assertFalse(ok)
         self.assertIn("consent", text)
+
+    def test_manifest_problems_name_the_field_as_written(self):
+        document = json.loads((rj.ROOT / "submissions" / "example.json").read_text())
+        document["bundles"][1]["doi_or_url"] = "http://example.org/x.tar.gz"
+        document["consent"]["publish_under_cc_by_4_0"] = False
+        problems = rj.check_manifest(document, "example", {"gzip"})
+        text, _ok = rj.build_comment({"ok": False, "problems": problems, "runs": []}, {}, {}, "u")
+        self.assertIn("`bundles.1.doi_or_url`: is not in the form", text)
+        self.assertIn("`consent.publish_under_cc_by_4_0`", text)
+
+    def test_manifest_problem_text_cannot_write_markdown(self):
+        for evil in ("$.a[0]`x: @maintainer [click](http://evil.example) <b>", "$: `oops` [x](y)"):
+            line = rj.manifest_error(evil)
+            self.assertNotIn("@maintainer", line.replace("`", ""))
+            for bad in ("[", "]", "<", ">"):
+                self.assertNotIn(bad, line)
+            self.assertEqual(line.count("`") % 2, 0)
+
+    def test_flake_count_reads_as_a_sentence(self):
+        for flake, words in ((0, "0 branches differ"), (1, "1 branch differs"), (3, "3 branches differ")):
+            self.assertEqual(rj.flake_words(flake), words)
+
+    def test_a_checksum_mismatch_shows_both_hashes_whole(self):
+        got, expected = "a" * 63 + "0", "a" * 63 + "1"
+        line = rj.MESSAGES["checksum_mismatch"]({"link": "https://example.org/x.tar.gz", "got": got, "expected": expected})
+        self.assertIn(f"`{got}`", line)
+        self.assertIn(f"`{expected}`", line)
 
     def test_artifact_content_is_untrusted(self):
         with tempfile.TemporaryDirectory() as tmp:

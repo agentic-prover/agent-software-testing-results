@@ -78,10 +78,9 @@ only counts; and that the release file agrees with the tables.
    and say which files were regenerated. A submission pull request adds only `submissions/<system_id>.json`.
 2. Run `python scripts/derive.py` and `python scripts/check.py` and say that you did. A pull request that does not pass
    `check.py` is not merged.
-3. A submission pull request is replayed by a workflow after a maintainer approves it
-   ([docs/REPLAY-WORKFLOW.md](docs/REPLAY-WORKFLOW.md)). The runs are added in a follow-up pull request by a
-   maintainer and carry the replay evidence (bundle hashes, runner version, image identity, the flake check and the
-   manifest in `submissions/`). The submitter reviews it.
+3. A submission pull request is replayed by a workflow after a maintainer approves it, and merging it publishes it
+   ([docs/REPLAY-WORKFLOW.md](docs/REPLAY-WORKFLOW.md)). A workflow adds the runs and makes a new release. The manifest in
+   `submissions/` records where they came from.
 4. A pull request that corrects a published number adds an entry to the errata of the next release and states which
    release is wrong.
 5. A maintainer reviews and merges.

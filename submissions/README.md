@@ -12,8 +12,8 @@ are in `runs.csv`, `sets/` and `curves/`.
 ## Who writes a manifest
 
 The submitter writes the manifest and sends it as a pull request that adds `submissions/<system_id>.json`. The pull
-request is the submission. When it is accepted, the maintainers add the `system_id` if it was left out and add the runs
-to the same pull request or a follow-up one. The submitter reviews it there. Nothing in a manifest is a promise by the maintainers; the resources, hardware
+request is the submission. Merging it publishes it: a workflow adds the runs of its replay and makes a new release.
+Nothing in a manifest is a promise by the maintainers; the resources, hardware
 and tokens are the submitter's own statements and the published tables say so.
 
 ## Fields
@@ -21,7 +21,7 @@ and tokens are the submitter's own statements and the published tables say so.
 | Field | Meaning |
 |---|---|
 | `schema` | `agent-software-testing/submission@0.1` |
-| `system_id` | The id in `systems.csv`. It is the name of the file. The maintainers may set it when it is left out. |
+| `system_id` | The id in `systems.csv`. It is the name of the file, so it can be left out. |
 | `tool` | `name`, `version` (release, tag or commit that ran), `url`, `licence` (SPDX identifier, `proprietary` or `unknown`), `family` (`symbolic`, `fuzzer`, `hybrid`, `llm`, `agent`, `other`), `model` (language model or `null`), `config_sha256` (optional). |
 | `track` | `fixed` or `open`. A manifest has one track; submit the other track as another system. |
 | `budget` | `wall_s` (wall-clock seconds of one campaign), `cores`, optional `notes`. |
