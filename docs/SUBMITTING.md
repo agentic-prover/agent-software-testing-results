@@ -25,8 +25,8 @@ python3 -m agent_software_testing --help
 ```
 
 The runner's [README](https://github.com/agentic-prover/agent-software-testing#readme) describes the remaining
-options. Replaying (step 4) also needs Docker and the replay image, which you build from the same checkout with
-`environment/Dockerfile`. See [Getting the replay image](#getting-the-replay-image) below.
+options. Replaying (step 4) also needs Docker and the replay image. See
+[Getting the replay image](#getting-the-replay-image) below.
 
 ## What we need and what we never accept
 
@@ -99,7 +99,14 @@ default; under Singularity or Apptainer add `--pid`.
 
 #### Getting the replay image
 
-The image is built from the runner checkout. Its `builds` target compiles the coverage
+The image the maintainers replay with is public, so you can pull it:
+
+```
+docker pull ghcr.io/agentic-prover/agent-software-testing-replay@sha256:16c22f63accbb0a0a06e8f54e826eb870ca48ea2ec6d1957dcc79e7ac2c807fc
+docker tag ghcr.io/agentic-prover/agent-software-testing-replay@sha256:16c22f63accbb0a0a06e8f54e826eb870ca48ea2ec6d1957dcc79e7ac2c807fc agent-software-testing:builds
+```
+
+You can also build it from the runner checkout. Its `builds` target compiles the coverage
 and ASan+UBSan builds of all 18 programs into `/opt/agent-software-testing/builds` (this takes a while and downloads every
 source over HTTPS, verifying each SHA-256):
 

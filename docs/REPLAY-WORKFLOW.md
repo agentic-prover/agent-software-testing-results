@@ -10,10 +10,10 @@ comment on the pull request. It never pushes to the repository. Results enter th
    Required reviewers add the maintainers who may approve a replay. Leave the other options as they are. This is the
    only gate. The manifest job runs at once on every pull request. Everything that replays waits for this approval.
 2. **Publish the replay image.** In the runner repository open Actions, choose "Build replay image" and run it. It
-   compiles all 18 programs, so allow several hours. The run summary shows the image name with its digest and the
+   compiles all 18 programs, so allow about an hour. The run summary shows the image name with its digest and the
    size. Open the package in GitHub Container Registry and check that it is public, because the replay jobs hold no
    secrets and pull it anonymously.
-3. **Pin the image and the runner.** Edit `.github/replay-pins.json` through a pull request. Set `image` to the line
+3. **Pin the image and the runner.** Edit `.github/replay-pins.json`. Set `image` to the line
    from the run summary and `runner_ref` to the full commit of the runner repository that should do the replay. Until
    both are set every submission fails at once with a message that the setup is not finished.
 

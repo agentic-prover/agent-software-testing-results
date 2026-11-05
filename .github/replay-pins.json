@@ -1,5 +1,5 @@
 {
   "runner_repository": "agentic-prover/agent-software-testing",
-  "runner_ref": null,
-  "image": null
+  "runner_ref": "372267275f0f36d62611f0d2415b0abd6e27a6b7",
+  "image": "ghcr.io/agentic-prover/agent-software-testing-replay@sha256:16c22f63accbb0a0a06e8f54e826eb870ca48ea2ec6d1957dcc79e7ac2c807fc"
 }
