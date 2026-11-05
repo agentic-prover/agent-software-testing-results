@@ -645,6 +645,10 @@ def main():
     if counts != want_counts:
         err(f"RELEASE.json counts {counts} != {want_counts}")
     # The shape of the two fields, not a release's literal values: a new release bumps them and must pass.
+    try:
+        datetime.date.fromisoformat(rel.get("snapshot_date", ""))
+    except (TypeError, ValueError):
+        err("RELEASE.json: snapshot_date is not an ISO date (YYYY-MM-DD)")
     if not isinstance(rel.get("version"), str) or not re.fullmatch(r"\d+\.\d+\.\d+", rel["version"]):
         err("RELEASE.json: version is not of the form N.N.N")
     try:

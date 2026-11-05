@@ -64,7 +64,7 @@ jobs:
           name: prepare
           path: ${{ runner.temp }}/prepare
           overwrite: true
-          retention-days: 30
+          retention-days: 90
           if-no-files-found: ignore
 
   # A person approves here once. Set required reviewers on the environment "replay" (Settings, Environments).
@@ -76,6 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: replay
+    permissions: {}
     steps:
       - run: echo "A maintainer approved the replay."
 
@@ -85,8 +86,7 @@ jobs:
     needs: [prepare, approve]
     runs-on: ubuntu-latest
     timeout-minutes: 350
-    permissions:
-      contents: read
+    permissions: {}
     strategy:
       fail-fast: false
       max-parallel: 20
@@ -149,7 +149,7 @@ jobs:
           name: data-coverage-${{ matrix.run.name }}
           path: ${{ runner.temp }}/data
           overwrite: true
-          retention-days: 30
+          retention-days: 90
           if-no-files-found: ignore
 
   # Stage 2: sanitiser pass, one job per program. A job takes the repeats of its program one after the other, so that a
@@ -159,8 +159,7 @@ jobs:
     needs: [prepare, approve, coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 350
-    permissions:
-      contents: read
+    permissions: {}
     strategy:
       fail-fast: false
       max-parallel: 20
@@ -223,13 +222,115 @@ jobs:
           name: data-signatures-${{ matrix.prog.name }}
           path: ${{ runner.temp }}/data
           overwrite: true
-          retention-days: 30
+          retention-days: 90
           if-no-files-found: ignore
+
+  # Stage 3: the website with this submission added, at /preview/. It reads the results as data and runs the same checks
+  # as a merge would. Nothing public changes: the rest of the site is built again from the main branch.
+  preview:
+    name: Build the preview
+    needs: [prepare, approve, coverage, sanitiser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      built_from: ${{ steps.main.outputs.commit }}
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          path: results
+          persist-credentials: false
+      - name: Check out the site
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ github.repository_owner }}/agent-software-testing-site
+          ref: main
+          path: site
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - id: pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      - name: Get the plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: prepare
+          path: ${{ runner.temp }}/plan
+      - name: Get the results of the replay
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: "data-*"
+          path: ${{ runner.temp }}/data
+      - id: main
+        name: Note the commit of the main branch
+        run: echo "commit=$(git -C results rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Add the results to a copy
+        env:
+          PLAN_FILE: ${{ runner.temp }}/plan/plan.json
+          DATA_DIR: ${{ runner.temp }}/data
+          OUT_FILE: ${{ runner.temp }}/preview/preview.json
+          PREVIEW_URL: ${{ steps.pages.outputs.base_url }}/preview/
+        run: |
+          mkdir -p "$(dirname "$OUT_FILE")"
+          cp -R results candidate
+          python3 candidate/scripts/publish_submission.py candidate
+      - name: Build and check both
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: python site/scripts/pages_build.py results "$RUNNER_TEMP/site-out" --base-path "$BASE_PATH/" --site-url "$BASE_URL/" --preview candidate
+      - name: Say that the website does not build
+        if: failure()
+        env:
+          OUT_FILE: ${{ runner.temp }}/preview/preview.json
+        run: |
+          [ -f "$OUT_FILE" ] && grep -q '"ok": false' "$OUT_FILE" && exit 0
+          echo '{"ok": false, "flags": [], "problem": "The website does not build or pass its checks with this submission.", "url": ""}' > "$OUT_FILE"
+      - name: Keep what the comment needs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: preview
+          path: ${{ runner.temp }}/preview
+          overwrite: true
+          retention-days: 90
+          if-no-files-found: ignore
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: ${{ runner.temp }}/site-out
+
+  preview-deploy:
+    name: Put the preview online
+    needs: preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Stop if the main branch moved, so that the site never goes back
+        env:
+          BUILT_FROM: ${{ needs.preview.outputs.built_from }}
+          REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          now=$(git ls-remote "$REPOSITORY" refs/heads/main | cut -f1)
+          [ "$now" = "$BUILT_FROM" ] || { echo "The main branch moved while the preview was built."; exit 1; }
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   # The only job that writes to the pull request. It runs nothing from the submission.
   summary:
     name: Summary comment
-    needs: [prepare, approve, coverage, sanitiser]
+    needs: [prepare, approve, coverage, sanitiser, preview, preview-deploy]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -254,6 +355,12 @@ jobs:
         with:
           pattern: "result-*"
           path: ${{ runner.temp }}/artifacts
+      - name: Get the state of the preview
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: preview
+          path: ${{ runner.temp }}/artifacts/preview
       - name: Post or update the comment
         env:
           GH_TOKEN: ${{ github.token }}
@@ -266,4 +373,5 @@ jobs:
           NEEDS_APPROVE: ${{ needs.approve.result }}
           NEEDS_COVERAGE: ${{ needs.coverage.result }}
           NEEDS_SANITISER: ${{ needs.sanitiser.result }}
+          NEEDS_PREVIEW_DEPLOY: ${{ needs.preview-deploy.result }}
         run: python3 scripts/replay_job.py comment

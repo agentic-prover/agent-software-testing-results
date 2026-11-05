@@ -24,6 +24,7 @@ from __future__ import annotations
 import csv
 import gzip
 import json
+import re
 import statistics
 import sys
 from collections import defaultdict
@@ -132,7 +133,10 @@ def update_readme(runs, systems):
         return
     head, rest = text.split(README_START, 1)
     _, tail = rest.split(README_END, 1)
-    path.write_text(head + README_START + "\n" + systems_table(runs, systems) + "\n" + README_END + tail)
+    text = head + README_START + "\n" + systems_table(runs, systems) + "\n" + README_END + tail
+    programs = {r["program"] for r in runs}
+    counts = f"holds {len(systems)} systems on {len(programs)} programs, {len(runs)} runs"
+    path.write_text(re.sub(r"holds \d+ systems on \d+ programs, \d+ runs", counts, text, count=1))
 
 
 def main():

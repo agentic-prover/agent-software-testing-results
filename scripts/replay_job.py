@@ -53,6 +53,7 @@ LINK_RE = re.compile(r"^https://[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?(?:/[A-
 DOI_RE = re.compile(r"^10\.[0-9]{4,9}/[A-Za-z0-9._-]+$")
 ZENODO_DOI_RE = re.compile(r"^10\.5281/zenodo\.([0-9]{1,12})$")
 ZENODO_PAGE_RE = re.compile(r"^https://zenodo\.org/records?/([0-9]{1,12})/?$")
+PREVIEW_URL_RE = re.compile(r"https://[A-Za-z0-9.-]+(/[A-Za-z0-9._-]+)*/preview/")
 MAX_LINK = 300
 MAX_RUNS = 256            # the most jobs one matrix may hold
 MAX_REPEAT = 99
@@ -277,7 +278,7 @@ def make_plan(document: dict, stem: str, pr: int, head_sha: str) -> dict:
             "repeat": entry["repeat"], "source": entry["doi_or_url"], "sha256": entry["sha256"],
         })
     return {"schema": "replay-plan@1", "pr": pr, "head_sha": head_sha, "system_id": stem, "track": document["track"],
-            "tool": {"name": document["tool"]["name"], "version": document["tool"]["version"]}, "runs": runs}
+            "tool": {"name": document["tool"]["name"], "version": document["tool"]["version"]}, "runs": runs, "manifest": document}
 
 
 def check_run_entry(run: Any) -> dict:
@@ -603,7 +604,7 @@ def container_args(image: str, runner_dir: Path, bundle: Path, out_parent: Path,
     """The documented flags of docs/SUBMITTING.md: no network, read-only root, own process view (Docker's default)."""
     return [
         "run", "--rm", "--name", name, "--platform", "linux/amd64", "--network", "none", "--read-only",
-        "--pids-limit", "4096", "--memory", "14g", "--memory-swap", "14g", "--tmpfs", "/tmp:exec,size=2g",
+        "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "4096", "--memory", "14g", "--memory-swap", "14g", "--tmpfs", "/tmp:exec,size=2g",
         "-e", "PYTHONPATH=/cr/src", "-e", "PYTHONDONTWRITEBYTECODE=1",
         "-v", f"{runner_dir}:/cr:ro", "-v", f"{bundle}:/bundle:ro", "-v", f"{out_parent}:/results",
         image, "python3", "-m", "agent_software_testing", *command,
@@ -1014,8 +1015,26 @@ def cases_text(cov: dict) -> str:
     return f"{cov.get('cases', '?')}" + (f" ({', '.join(parts)})" if parts else "")
 
 
+def preview_lines(preview: dict | None) -> tuple[list[str], bool]:
+    """What the comment says about the preview, and whether this submission can be published. ``preview`` came through an
+    artifact, so it is read as untrusted text."""
+    if not isinstance(preview, dict):
+        return ["No preview was made.", ""], False
+    if preview.get("ok") is not True:
+        return [f"**This submission cannot be published yet.** {clean(preview.get('problem') or 'The preview could not be built.', 300)}", ""], False
+    url = str(preview.get("url") or "")
+    if PREVIEW_URL_RE.fullmatch(url):
+        lines = [f"**[Preview of the website with this submission]({url}).** Nothing public changes until a maintainer merges.", ""]
+    else:
+        lines = ["The submission can be published, but its preview is not online.", ""]
+    flags = preview.get("flags") if isinstance(preview.get("flags"), list) else []
+    if flags:
+        lines += ["Worth a look before merging:", ""] + [f"* {clean(flag, 200)}" for flag in flags[:20]] + [""]
+    return lines, True
+
+
 def build_comment(prepare_record: dict | None, results: dict, needs: dict, run_url: str,
-                  commit: str = "") -> tuple[str, bool]:
+                  commit: str = "", preview: dict | None = None) -> tuple[str, bool]:
     """The text of the comment and whether the whole check passed. ``results`` maps ("coverage", run name) and
     ("signatures", program) to a loaded result, or to None when the stage did not start."""
     lines = [MARKER]
@@ -1099,6 +1118,10 @@ def build_comment(prepare_record: dict | None, results: dict, needs: dict, run_u
     if incomplete:
         lines += ["", "Programs with fewer than three repeats are kept but marked incomplete: "
                   + ", ".join(clean(p, 40) for p in incomplete) + "."]
+    if all_ok:
+        said, publishable = preview_lines(preview)
+        lines += [""] + said
+        all_ok = publishable
     lines += ["", f"[Workflow run and artifacts]({run_url})"]
     text = "\n".join(lines)
     if len(text) > 60000:
@@ -1239,7 +1262,13 @@ def cmd_comment() -> int:
             for name in ([r["name"] for r in (record or {}).get("runs") or []] if stage == "coverage"
                          else (record or {}).get("programs") or []):
                 results[(stage, name)] = None
-    body, ok = build_comment(record, results, needs, os.environ["RUN_URL"], os.environ.get("HEAD_SHA", ""))
+    try:
+        preview = read_small_json(artifacts / "preview" / "preview.json")
+    except (OSError, ValueError, RecursionError):
+        preview = None
+    if isinstance(preview, dict) and os.environ.get("NEEDS_PREVIEW_DEPLOY") != "success":
+        preview["url"] = ""
+    body, ok = build_comment(record, results, needs, os.environ["RUN_URL"], os.environ.get("HEAD_SHA", ""), preview)
     api = github_api(os.environ["GH_TOKEN"], os.environ.get("GITHUB_API_URL", "https://api.github.com"))
     log_line("summary comment " + post_comment(api, os.environ["REPO"], env_int("PR_NUMBER"), body))
     return 0 if ok else 1

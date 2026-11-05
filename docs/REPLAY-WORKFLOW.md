@@ -2,8 +2,8 @@
 
 A pull request that adds `submissions/<system_id>.json` is a submission. The workflow in `.github/workflows/replay.yml`
 reads the manifest, waits for a maintainer to approve, replays every listed bundle on free GitHub runners and posts one
-comment on the pull request. It never pushes to the repository. Results enter the data only when a maintainer merges;
-`.github/workflows/publish.yml` then adds them and makes a release.
+comment on the pull request with a preview of the website. It never pushes to the repository. Results enter the data
+only when a maintainer merges; `.github/workflows/publish.yml` then adds them and updates the website.
 
 ## Settings to change once
 
@@ -17,11 +17,8 @@ comment on the pull request. It never pushes to the repository. Results enter th
 3. **Pin the image and the runner.** Edit `.github/replay-pins.json`. Set `image` to the line
    from the run summary and `runner_ref` to the full commit of the runner repository that should do the replay. Until
    both are set every submission fails at once with a message that the setup is not finished.
-4. **Let a release start the site's rebuild.** Create a fine-grained token that can reach only the repository
-   `agent-software-testing-site`, with the permission Actions set to read and write. Save it in this repository under
-   Settings, Secrets and variables, Actions, as `SITE_REBUILD_TOKEN`. To try it, open Actions here, choose "Publish
-   submission" and run it. Without the token a release still happens, and the workflow "Rebuild the site" of the site
-   repository has to be run by hand.
+4. **Serve the website from this repository.** Open Settings, then Pages, and set the source to GitHub Actions. The
+   custom domain goes there too. No stored secret is needed: each job uses the short-lived permissions GitHub gives it.
 5. **Allow the workflows' trigger.** From 2 December 2026 GitHub blocks `pull_request_target` in public repositories
    unless a policy allows it, and without it nothing starts when a pull request is opened. Open Settings, then under
    Actions choose Policies and create a policy for `.github/workflows/replay.yml` and `.github/workflows/publish.yml`
@@ -47,7 +44,13 @@ for its own run. Changes to either go through review like any other change.
    signature once over the repeats, on the runner.
 5. The last job writes or updates one comment with a table of every run and, for each failure, what failed and
    what to do. It fails when any run failed. The pull request then stays red.
-6. A maintainer reads the result and merges. See [What the merge does](#what-the-merge-does).
+6. A preview follows when every run has passed. It adds the results to a copy of the data, runs the same checks as a
+   merge and builds the website with them under `/preview/`, hidden from search engines. There is one preview at a time,
+   and the rest of the website is built again from the main branch. The comment links it and lists anything unusual: a
+   number far above the best so far, no coverage, repeats that differ a lot, many cases that hit their time limit or
+   branches that differ on a second replay. These flags ask a person to look and stop nothing. A submission that fails
+   the checks says why, and the pull request stays red.
+7. A maintainer looks at the preview and at Files changed, and merges. See [What the merge does](#what-the-merge-does).
 
 A new push to the pull request cancels the running workflow and starts a new one that needs approval again.
 
@@ -80,26 +83,43 @@ A re-run uses the scripts and the pins of the commit the run started from. After
 
 ## What the merge does
 
-Merging a submission starts `.github/workflows/publish.yml`. It runs only after a merge, from the default branch, and it
-runs nothing from the submission. It does this:
+Merging a submission starts `.github/workflows/publish.yml`. It runs only after a merge, from the main branch, and it runs
+nothing from the submission. It does this:
 
 1. It finds a passed replay of exactly the merged commit. There must be one, and its plan must name this pull request.
 2. It reads the artifacts as data. `data-coverage-<program>-r<N>` gives the branch set, the curve and the counts of a run.
    `data-signatures-<program>` gives the sanitiser kinds and counts. The details of signatures (frames, examples and case
    ids) never leave the runner of the replay, and two free-text fields of `replay.json` are emptied before upload.
-3. It adds the runs to `sets/`, `curves/` and `runs.csv` and the system to `systems.csv`, and the tool to `tools.csv` if it
-   is new. A program with fewer than three repeats carries the note `incomplete` and a falling curve states its fall. The
+3. It adds the runs to `sets/`, `curves/` and `runs.csv`, the system to `systems.csv` and the tool to `tools.csv` if it is
+   new. A program with fewer than three repeats carries the note `incomplete` and a falling curve states its fall. The
    name, version, family, budget and notes come from the manifest. The backend is `other`, the group `main` and the
    configuration `unknown`, so a maintainer who knows better corrects them in a later pull request.
-4. It runs `scripts/derive.py`, updates `RELEASE.json` to the next release and runs `scripts/check.py`.
-5. If that passes it commits, tags the release `v<version>` and pushes both, and starts the site's rebuild. The site's
-   workflow builds from the new release, checks the build and commits `docs/`.
+4. It runs `scripts/derive.py` and `scripts/check.py`, and pushes only if they pass.
+5. It builds the website, checks the build and publishes it. A job that can do nothing except publish pages does that last
+   step. The entry is marked new for 30 days.
 
-If any step fails nothing is pushed and a comment on the pull request says why. Fix the cause and re-run the job from the
-Actions tab. A change to a manifest that is already published does not make a release.
+If any step fails nothing is pushed or published and a comment on the pull request says why. Fix the cause and re-run the
+job from the Actions tab. A change to a manifest that is already published adds nothing.
 
-Artifacts stay for 30 days. A merge after that says so on the pull request. Open a new pull request that changes the
-manifest, a note is enough, and its replay and its merge publish the submission.
+Merge within 90 days of the replay, because GitHub keeps its results for that long. A merge after that says so on the pull
+request. Open a new pull request that changes the manifest, a note is enough, and replay it.
+
+## Going back
+
+Open Actions here, choose "Publish" and press Run workflow:
+
+* **Withdraw** takes the `system_id` of an entry. It stays in the data with the status `withdrawn`, leaves the comparison
+  and the website updates.
+* **Show an earlier commit** takes a commit of this repository and publishes the website from its data, for a mistake that
+  needs undoing at once. The next merge publishes the latest data again, so also fix the data.
+
+Running it with both fields empty rebuilds the website from the latest data, for example after a change to the site's code.
+
+## Snapshots
+
+The data moves on with each merge and git keeps the history. When a paper needs fixed numbers to cite, tag that commit
+`v<version>`, set `version`, `release` and `snapshot_date` in `RELEASE.json` and archive it. Links on the website name the
+exact commit they were built from.
 
 ## Limits
 

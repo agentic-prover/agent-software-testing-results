@@ -33,6 +33,7 @@ SHA = "ab" * 32
 HEAD = "c" * 40
 NO_SLEEP = lambda seconds: None  # noqa: E731
 SECRET = "SECRET-FRAME-xyz"
+GOOD_PREVIEW = {"ok": True, "flags": [], "problem": "", "url": "https://example.org/preview/"}
 
 
 def make_root(tmp: Path, pins: bool = True) -> Path:
@@ -617,7 +618,7 @@ class CommentChecks(unittest.TestCase):
     def test_all_good(self):
         results = {("coverage", r["name"]): self.passed() for r in self.runs}
         results[("signatures", "gzip")] = self.sig_ok()
-        text, ok = rj.build_comment(self.record, results, {"approve": "success"}, "https://example.org/run")
+        text, ok = rj.build_comment(self.record, results, {"approve": "success"}, "https://example.org/run", "", GOOD_PREVIEW)
         self.assertTrue(ok)
         self.assertTrue(text.startswith(rj.MARKER))
         self.assertEqual(text.count("| Program |"), 1)
@@ -633,7 +634,7 @@ class CommentChecks(unittest.TestCase):
     def test_sanitiser_kinds_and_counts_are_shown_per_program(self):
         results = {("coverage", r["name"]): self.passed() for r in self.runs}
         results[("signatures", "gzip")] = self.sig_ok([{"sanitizer": "ASan", "kind": "SEGV", "signatures": 2}])
-        text, ok = rj.build_comment(self.record, results, {"approve": "success"}, "u")
+        text, ok = rj.build_comment(self.record, results, {"approve": "success"}, "u", "", GOOD_PREVIEW)
         self.assertTrue(ok)
         self.assertIn("ASan SEGV 2", text)
 
@@ -656,6 +657,35 @@ class CommentChecks(unittest.TestCase):
         text, ok = rj.build_comment(record, {}, {}, "u")
         self.assertFalse(ok)
         self.assertIn("consent", text)
+
+    def preview_comment(self, preview):
+        record = {"ok": True, "problems": [], "system_id": "gzip-tool", "runs": [{"index": 0, "name": "gzip-r1", "program": "gzip", "repeat": 1}], "programs": ["gzip"], "incomplete": []}
+        results = {("coverage", "gzip-r1"): {"state": rj.STATE_PASSED, "code": None, "covered": 5, "total": 9, "cases": 7, "flake": 0, "params": {}},
+                   ("signatures", "gzip"): {"state": rj.STATE_PASSED, "code": None, "rows": [], "repeats": [], "params": {}}}
+        needs = {"prepare": "success", "approve": "success", "coverage": "success", "sanitiser": "success"}
+        return rj.build_comment(record, results, needs, "https://example.org/run", "a" * 40, preview)
+
+    def test_the_comment_links_the_preview_and_lists_what_to_look_at(self):
+        text, ok = self.preview_comment({**GOOD_PREVIEW, "flags": ["gzip: the median is far above the best so far."]})
+        self.assertTrue(ok)
+        self.assertIn("(https://example.org/preview/)", text)
+        self.assertIn("far above the best", text)
+
+    def test_a_submission_that_cannot_be_published_fails_with_the_reason(self):
+        text, ok = self.preview_comment({"ok": False, "flags": [], "problem": "check.py refused the new data", "url": ""})
+        self.assertFalse(ok)
+        self.assertIn("cannot be published", text)
+        self.assertIn("check.py refused", text)
+        self.assertFalse(self.preview_comment(None)[1])
+
+    def test_preview_text_is_untrusted(self):
+        text, _ok = self.preview_comment({"ok": True, "flags": ["@maintainer [click](http://evil.example) <b>"],
+                                          "url": "https://evil.example/x)[a](http://evil.example/preview/"})
+        self.assertNotIn("@maintainer", text)
+        self.assertNotIn("[click](", text)
+        self.assertNotIn("[a](", text)
+        self.assertNotIn("<b>", text)
+        self.assertIn("not online", text)
 
     def test_manifest_problems_name_the_field_as_written(self):
         document = json.loads((rj.ROOT / "submissions" / "example.json").read_text())
@@ -1067,7 +1097,7 @@ class ReviewFindings(unittest.TestCase):
                                              "timeouts": 2, "not_started": 1, "flake": 0, "params": {}},
                    ("signatures", "gzip"): {"state": rj.STATE_PASSED, "code": None, "rows": [], "repeats": [], "params": {}}}
         needs = {"prepare": "success", "approve": "success", "coverage": "success", "sanitiser": "success"}
-        body, ok = rj.build_comment(record, results, needs, "https://example.org/run", "a" * 40)
+        body, ok = rj.build_comment(record, results, needs, "https://example.org/run", "a" * 40, GOOD_PREVIEW)
         self.assertTrue(ok)
         self.assertIn("For commit `aaaaaaaaaaaa`.", body)
         self.assertIn("7 (2 timed out, 1 did not start)", body)

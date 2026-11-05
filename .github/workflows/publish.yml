@@ -1,10 +1,12 @@
-# Publishes a submission when a maintainer merges it: adds the results of its passed replay to the data, makes a new
-# release and starts the site's rebuild. Read docs/REPLAY-WORKFLOW.md before changing anything here.
-#  * pull_request_target, so that this file and the scripts come from the default branch. Nothing from the pull request
-#    is checked out or run.
+# Puts the data and the website online when a maintainer merges a submission. Read docs/REPLAY-WORKFLOW.md before changing
+# anything here.
+#  * pull_request_target, so that this file and the scripts come from the main branch. Nothing from the pull request is
+#    checked out or run.
 #  * The results are read as data from the artifacts of the replay of exactly the merged commit.
-#  * If a check fails nothing is pushed and the pull request says why.
-name: Publish submission
+#  * If a check fails nothing is pushed or published and the pull request says why.
+#  * No stored secret: each job uses the short-lived permissions GitHub gives it, and only the jobs below need more than
+#    reading. The last job can only publish pages.
+name: Publish
 
 on:
   pull_request_target:
@@ -14,23 +16,26 @@ on:
       - "submissions/*.json"
       - "!submissions/schema.json"
       - "!submissions/example.json"
-  # Starts the site's rebuild alone, for a change on the site or to try the token.
   workflow_dispatch:
+    inputs:
+      withdraw:
+        description: "An entry to withdraw (its system_id). Leave empty otherwise."
+        required: false
+        default: ""
+      results_ref:
+        description: "Show the data of this earlier commit, to go back after a mistake. Leave empty for the latest."
+        required: false
+        default: ""
 
-permissions:
-  contents: read
-
-concurrency:
-  group: publish-submission
-  cancel-in-progress: false
+permissions: {}
 
 env:
   PYTHONDONTWRITEBYTECODE: "1"
 
 jobs:
-  publish:
-    name: Add the results and make a release
-    if: github.event.pull_request.merged == true
+  data:
+    name: Add the results to the data
+    if: github.event.pull_request.merged == true || inputs.withdraw != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -43,7 +48,8 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Publish
+      - name: Add and push
+        if: github.event.pull_request.merged == true
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -51,23 +57,62 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           SUBMITTED: ${{ github.event.pull_request.created_at }}
         run: python3 scripts/publish_submission.py publish
+      - name: Withdraw and push
+        if: inputs.withdraw != ''
+        env:
+          SYSTEM_ID: ${{ inputs.withdraw }}
+        run: python3 scripts/publish_submission.py withdraw
 
-  site:
-    name: Start the site's rebuild
-    needs: publish
-    if: ${{ !cancelled() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch') }}
+  build:
+    name: Build and check the website
+    needs: data
+    if: ${{ !cancelled() && (needs.data.result == 'success' || github.event_name == 'workflow_dispatch') && needs.data.result != 'failure' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     permissions:
       contents: read
+      pages: read
     steps:
-      - name: Check out the main branch
+      - name: Check out the data
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: main
+          ref: ${{ inputs.results_ref || 'main' }}
+          path: results
           persist-credentials: false
-      - name: Start it
+      - name: Check out the site
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ github.repository_owner }}/agent-software-testing-site
+          ref: main
+          path: site
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - id: pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+      - name: Build and check
         env:
-          SITE_TOKEN: ${{ secrets.SITE_REBUILD_TOKEN }}
-          SITE_REPO: ${{ github.repository_owner }}/agent-software-testing-site
-        run: python3 scripts/publish_submission.py rebuild-site
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: python site/scripts/pages_build.py results "$RUNNER_TEMP/site-out" --base-path "$BASE_PATH/" --site-url "$BASE_URL/"
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: ${{ runner.temp }}/site-out
+
+  deploy:
+    name: Put the website online
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -34,7 +34,7 @@ options. Replaying (step 4) also needs Docker and the replay image. See
 * At least **three independent repeats** per program and track: campaigns of the same configuration, started afresh with
   their own random seeds (and, for model-driven tools, their own sampling). Replaying one campaign three times is not
   three repeats (SPEC section 9.1). A tool with fewer repeats on a program is kept but marked `incomplete`.
-* One **budget** that you state and keep: wall-clock time and cores. Release 0.1 uses six hours; other budgets are
+* One **budget** that you state and keep: wall-clock time and cores. The first entries use six hours; other budgets are
   accepted and labelled. Cases found after the budget are not replayed.
 
 We **never accept coverage numbers**, only test cases. Resources (cores, tokens, CPU time, hardware) are self-reported and
@@ -93,7 +93,7 @@ replayed. Use `--programs DIR` to name the `programs/` directory of your checkou
 
 ### 4. Check it yourself (optional, recommended)
 
-Replay the bundle in the reference image, started without network access, with a read-only root file system and with a
+Replay the bundle in the reference image, started without network access or extra privileges, with a read-only root file system and with a
 process view of its own (`SPEC.md` section 6.7), on the coverage build of the program. Docker gives that process view by
 default; under Singularity or Apptainer add `--pid`.
 
@@ -129,6 +129,7 @@ BUNDLE=$PWD/path/to/bundle
 mkdir -p out && sudo chown 10001 out    # Docker Desktop maps ownership itself; on Linux the image runs as uid 10001
 
 docker run --rm --platform linux/amd64 --network none --read-only \
+    --cap-drop ALL --security-opt no-new-privileges \
     --pids-limit 4096 --tmpfs /tmp:exec,size=2g \
     -e PYTHONPATH=/cr/src -e PYTHONDONTWRITEBYTECODE=1 \
     -v "$RUNNER":/cr:ro -v "$BUNDLE":/bundle:ro -v "$PWD/out":/results \
@@ -150,6 +151,7 @@ the program's binary with `obj-gcov/` replaced by `obj-native/`):
 
 ```
 docker run --rm --platform linux/amd64 --network none --read-only \
+    --cap-drop ALL --security-opt no-new-privileges \
     --pids-limit 4096 --tmpfs /tmp:exec,size=2g \
     -e PYTHONPATH=/cr/src -e PYTHONDONTWRITEBYTECODE=1 \
     -v "$RUNNER":/cr:ro -v "$BUNDLE":/bundle:ro -v "$PWD/out":/results \
@@ -209,10 +211,10 @@ failed and what to do. A test case that crashes a program is normal and does not
 
 ### 7. Publication
 
-A maintainer reads the result and merges the pull request. The merge publishes the submission. A workflow takes the
-results of the replay of the merged commit, adds them to the data, runs the full check, makes a new release and rebuilds
-the website. The pull request says when that is done, or why it stopped. Nothing else is needed from you or from the
-maintainers.
+As soon as the replay has passed, the comment on your pull request gives your numbers and a link to a preview of the
+website with your tool on it. Nothing public has changed yet. A maintainer looks at the preview and merges, and your tool
+is then on the website within minutes, marked as new. The pull request says if something stopped it. Nothing else is
+needed from you.
 
 The system is listed with the name, version, family, budget and notes of your manifest, so write them as you want them
 to be read. A new version of a tool is a new system with a manifest of its own. For a correction later, open a pull
@@ -225,8 +227,8 @@ request or a Data issue.
   labelled as such. The runner cannot verify the times of the cases (SPEC section 11).
 * **Each measurement is labelled.** Every table shows the track, budget, cores, number of repeats and measure of each
   system. There is no global ranking.
-* **Releases do not change.** A published release is never edited. A result can be superseded or withdrawn in a later
-  release and corrections go into the errata of the next one.
+* **Results can be corrected in the open.** A result can be superseded or withdrawn, and it stays in the data with that
+  status. A tagged snapshot is never edited.
 * **Bugs found through replays are not published by you.** The maintainers report them to the program's maintainers
   (see [DISCLOSURE.md](../DISCLOSURE.md)). You may publish counts, but not details of unfixed bugs.
 * **Be honest about what the tool did.** A bundle must contain what your tool produced in the stated budget with the

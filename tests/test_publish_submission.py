@@ -118,12 +118,12 @@ def published(tmp_path_factory):
 
 
 class TestPublished:
-    def test_it_makes_the_next_release(self, published):
+    def test_it_updates_the_data_without_a_new_version(self, published):
         root, result = published
         before = json.loads((ROOT / "RELEASE.json").read_text())
         release = json.loads((root / "RELEASE.json").read_text())
-        assert result[0] == "newtool" and result[1] == release["release"] and result[2] == release["version"]
-        assert release["previous_release"] == before["release"]
+        assert result == "newtool"
+        assert (release["release"], release["version"]) == (before["release"], before["version"])
         assert release["date"] == TODAY.isoformat()
         assert release["counts"]["systems"] == before["counts"]["systems"] + 1
         assert release["counts"]["runs"] == before["counts"]["runs"] + 3
@@ -136,7 +136,7 @@ class TestPublished:
         root, _result = published
         system = next(s for s in table(root, "systems.csv") if s["system_id"] == "newtool")
         assert (system["label"], system["family"], system["budget_s"], system["track"]) == ("Newtool 1.2, 2 cores, 1 h", "fuzzer", "3600", "open")
-        assert (system["first_release"], system["submitted"], system["status"]) == (json.loads((root / "RELEASE.json").read_text())["release"], "2026-11-19", "current")
+        assert (system["submitted"], system["status"]) == ("2026-11-19", "current")
         runs = [r for r in table(root, "runs.csv") if r["system_id"] == "newtool"]
         assert [(r["program"], r["repeat"], r["covered"]) for r in runs] == [("gzip", "1", "101"), ("gzip", "2", "102"), ("gzip", "3", "103")]
         with gzip.open(root / runs[0]["set_path"], "rb") as fh:
@@ -144,6 +144,69 @@ class TestPublished:
         assert "extra" not in stored and stored["branch_covered"] == 101
         assert [t["tool_id"] for t in table(root, "tools.csv")].count("newtool") == 1
         assert [s for s in table(root, "derived/signatures.csv") if s["system_id"] == "newtool" and s["sanitizer"] == "ASan"][0]["kind"] == "none"
+
+
+def write_replay_files(replay: Replay, folder: Path) -> Path:
+    """The artifacts of a finished replay as the workflow downloads them, one folder for each."""
+    by_id = {a["id"]: a["name"] for a in replay.listed}
+    for number, archive in replay.archives.items():
+        with zipfile.ZipFile(io.BytesIO(archive)) as zf:
+            zf.extractall(folder / by_id[number])
+    return folder
+
+
+class TestCandidate:
+    def test_a_finished_replay_gives_a_candidate_that_passes_the_check(self, tmp_path):
+        root = copy_release(tmp_path / "copy")
+        before = (root / "RELEASE.json").read_text()
+        replay = Replay()
+        data = write_replay_files(replay, tmp_path / "data")
+        plan = json.loads((data / "prepare" / "plan.json").read_text())
+        plan["manifest"] = manifest("newtool")
+        plan_file = tmp_path / "plan.json"
+        plan_file.write_text(json.dumps(plan))
+        record = ps.candidate(plan_file, data, TODAY, root=root)
+        assert record["ok"] is True, record
+        assert (root / "submissions/newtool.json").is_file()
+        assert "newtool" in [s["system_id"] for s in table(root, "systems.csv")]
+        assert (ROOT / "RELEASE.json").read_text() == before
+
+    def test_a_candidate_that_fails_the_check_says_so_and_does_not_raise(self, tmp_path):
+        root = copy_release(tmp_path / "copy")
+        replay = Replay(bad_key=True)
+        data = write_replay_files(replay, tmp_path / "data")
+        plan = json.loads((data / "prepare" / "plan.json").read_text())
+        plan["manifest"] = manifest("newtool")
+        plan_file = tmp_path / "plan.json"
+        plan_file.write_text(json.dumps(plan))
+        record = ps.candidate(plan_file, data, TODAY, root=root)
+        assert record["ok"] is False and "check.py refused" in record["problem"]
+
+
+@pytest.mark.parametrize("runs,best,words", [
+    ([{"branch_covered": 0}], None, "cover no branch"),
+    ([{"branch_covered": 100}, {"branch_covered": 100}, {"branch_covered": 100}], 50, "far above the best"),
+    ([{"branch_covered": 10}, {"branch_covered": 100}, {"branch_covered": 110}], None, "differ a lot"),
+    ([{"branch_covered": 100, "status_counts": {"ok": 5, "timeout": 5}}], None, "time limit"),
+    ([{"branch_covered": 100, "flake": {"branches_differing": 50}}], None, "replayed again"),
+])
+def test_unusual_results_are_flagged(runs, best, words):
+    assert any(words in flag for flag in ps.flags_for("gzip", runs, best))
+
+
+def test_an_ordinary_result_is_not_flagged():
+    runs = [{"branch_covered": n, "status_counts": {"ok": 30}, "flake": {"branches_differing": 0}} for n in (100, 105, 110)]
+    assert ps.flags_for("gzip", runs, 200) == []
+
+
+def test_withdrawing_an_entry_keeps_the_data_and_passes_the_check(tmp_path):
+    root = copy_release(tmp_path / "copy")
+    run(root, Replay())
+    ps.withdraw(root, "newtool")
+    assert next(s for s in table(root, "systems.csv") if s["system_id"] == "newtool")["status"] == "withdrawn"
+    assert [r for r in table(root, "runs.csv") if r["system_id"] == "newtool"]
+    with pytest.raises(ps.PublishError):
+        ps.withdraw(root, "no-such-system")
 
 
 def test_a_system_with_too_few_repeats_is_marked_incomplete_and_a_dip_is_stated(tmp_path):
@@ -214,14 +277,6 @@ def test_a_tool_of_another_name_keeps_its_own_row(tmp_path):
     assert "newtool-newtool" in [t["tool_id"] for t in table(root, "tools.csv")]
 
 
-@pytest.mark.parametrize("release,version,today,expected", [
-    ("2026.1", "0.1.0", datetime.date(2026, 11, 20), ("2026.2", "0.1.1")),
-    ("2026.9", "0.1.8", datetime.date(2027, 1, 2), ("2027.1", "0.1.9")),
-])
-def test_next_release(release, version, today, expected):
-    assert ps.next_release(release, version, today) == expected
-
-
 def test_a_name_inside_an_artifact_is_only_looked_up():
     archive = zipped({"../../evil.txt": b"x", "plan.json": b"{}"})
     assert ps.read_member(archive, "plan.json") == b"{}"
@@ -229,28 +284,15 @@ def test_a_name_inside_an_artifact_is_only_looked_up():
         ps.read_member(archive, "replay.json")
 
 
-def test_the_site_rebuild_needs_its_token_and_asks_for_the_site_workflow(monkeypatch):
-    calls = []
-
-    def fake_api(token, base="https://api.github.com"):
-        def call(method, path, body=None, raw=False, limit=None):
-            calls.append((token, method, path, body))
-            return 204, b""
-        return call
-
-    monkeypatch.setattr(ps.rj, "github_api", fake_api)
-    monkeypatch.setenv("SITE_REPO", "example-org/site")
-    monkeypatch.delenv("SITE_TOKEN", raising=False)
-    assert ps.main(["rebuild-site"]) == 0 and calls == []
-    monkeypatch.setenv("SITE_TOKEN", "t")
-    assert ps.main(["rebuild-site"]) == 0
-    assert calls == [("t", "POST", "/repos/example-org/site/actions/workflows/rebuild.yml/dispatches", {"ref": "main"})]
-
-
 def test_the_workflow_runs_only_after_a_merge_and_never_checks_out_the_pull_request():
     text = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
-    assert "if: github.event.pull_request.merged == true" in text
+    assert "github.event.pull_request.merged == true" in text
     assert "ref: main" in text
     for line in text.splitlines():
         assert not (line.strip().startswith("ref:") and "head" in line)
     assert "pull_request_target" in text and "\n  pull_request:" not in text
+
+
+def test_no_workflow_needs_a_stored_secret():
+    for name in ("publish.yml", "replay.yml"):
+        assert "secrets." not in (ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
