@@ -3,13 +3,13 @@
   "system_id": "tryout",
   "tool": {
     "name": "Tryout",
-    "version": "0.2-varied",
+    "version": "0.3-fixed",
     "url": "https://github.com/dannkoh/agent-software-testing-results",
     "licence": "unknown",
     "family": "other",
     "model": null
   },
-  "track": "open",
+  "track": "fixed",
   "budget": {
     "wall_s": 3600,
     "cores": 2,
@@ -23,76 +23,40 @@
   "tokens": null,
   "bundles": [
     {
-      "program": "bc",
+      "program": "krep",
       "repeat": 1,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-bc-open-r1.tar.gz",
-      "sha256": "cc15a68233c2855ad998c8c61cc63097b3f1221898120c21408d7fe248c70832"
+      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/c86adf7f0a3412d6fdcd786bf7622857cc42510a/fixed-krep-fixed-r1.tar.gz",
+      "sha256": "e870f6b56087504bf87836489cc2f9a9ced57fd719a97200389b524d795c9fac"
     },
     {
-      "program": "bc",
+      "program": "krep",
       "repeat": 2,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-bc-open-r2.tar.gz",
-      "sha256": "1c0694c743d9d40fce68d3aa47d17317941b2d6d3344f6ed49339ec65be5f9b2"
+      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/c86adf7f0a3412d6fdcd786bf7622857cc42510a/fixed-krep-fixed-r2.tar.gz",
+      "sha256": "b035b0f30f87be171273e5a8be87207b5bd770f6abdd9f981c717f149c7ba873"
     },
     {
-      "program": "bc",
+      "program": "krep",
       "repeat": 3,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-bc-open-r3.tar.gz",
-      "sha256": "c0fbd5c0da7ace62fe18ccb059b6fea51e63aa8c5f3209e8c7a12f18b34a2389"
+      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/c86adf7f0a3412d6fdcd786bf7622857cc42510a/fixed-krep-fixed-r3.tar.gz",
+      "sha256": "3aed8cbceca0df904859bc9cb78ddc00125a1ed7c04962b3af6ae9c6be217dc9"
     },
     {
-      "program": "jq",
+      "program": "libyaml",
       "repeat": 1,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-jq-open-r1.tar.gz",
-      "sha256": "9644c2ceacb66f79fd0b078c41a18eb0366c95ab7d8dd3f0023d662b64858a2d"
+      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/c86adf7f0a3412d6fdcd786bf7622857cc42510a/fixed-libyaml-fixed-r1.tar.gz",
+      "sha256": "e74d85186a1c1c28079254b534ab9abb89bedd9c17414b06ef190b934b2d0d45"
     },
     {
-      "program": "jq",
+      "program": "libyaml",
       "repeat": 2,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-jq-open-r2.tar.gz",
-      "sha256": "d941b0fa737712de06ee615fb5ab7df4f59cb791bdff113793792ef5247969a2"
+      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/c86adf7f0a3412d6fdcd786bf7622857cc42510a/fixed-libyaml-fixed-r2.tar.gz",
+      "sha256": "b6e670707e6ac50304c78a9785a79f5cf41fd0a161dcb8916110de21ac309c75"
     },
     {
-      "program": "jq",
+      "program": "libyaml",
       "repeat": 3,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-jq-open-r3.tar.gz",
-      "sha256": "78385c97b24ca6ca7dfff522c896fbcf476355b45d43c841cbe012aedb808d58"
-    },
-    {
-      "program": "sed",
-      "repeat": 1,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-sed-open-r1.tar.gz",
-      "sha256": "d8c4e8daf6271668035edd2b8850ad6e6f2a17be2dcee1e17a9010c8cd782c7c"
-    },
-    {
-      "program": "sed",
-      "repeat": 2,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-sed-open-r2.tar.gz",
-      "sha256": "53b60b55a74864bc153e6342b23d417f849329221cffe0bcd62b7cfdc8911a8a"
-    },
-    {
-      "program": "sed",
-      "repeat": 3,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-sed-open-r3.tar.gz",
-      "sha256": "d230fdfe4fc7c9a106d1ff5853d015c82941778910dd141a232976d9175af803"
-    },
-    {
-      "program": "xmlwf",
-      "repeat": 1,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-xmlwf-open-r1.tar.gz",
-      "sha256": "151d8d80def87e057c94bb0bf5f6ddb7764ba46f2441b09416642cd337cc1ff2"
-    },
-    {
-      "program": "xmlwf",
-      "repeat": 2,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-xmlwf-open-r2.tar.gz",
-      "sha256": "be0560f5669e9ce84d2380bfdf91beb797789245325fa3511cd322d309825511"
-    },
-    {
-      "program": "xmlwf",
-      "repeat": 3,
-      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/6346de0dd7373fe7bc0d7b86cb4309c147175366/varied-xmlwf-open-r3.tar.gz",
-      "sha256": "ec41e3e412b291c7de933abc74daaa90802a743b8644f36b206d5ada0366222f"
+      "doi_or_url": "https://raw.githubusercontent.com/dannkoh/agent-software-testing-results/c86adf7f0a3412d6fdcd786bf7622857cc42510a/fixed-libyaml-fixed-r3.tar.gz",
+      "sha256": "92832409703746fb61a64d5a26c4258933d5791a4e178ebdfb63094e9461e1f7"
     }
   ],
   "contact_handle": "dannkoh",
