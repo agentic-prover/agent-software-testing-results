@@ -22,6 +22,10 @@ comment on the pull request. It never pushes to the repository. Results enter th
    Settings, Secrets and variables, Actions, as `SITE_REBUILD_TOKEN`. To try it, open Actions here, choose "Publish
    submission" and run it. Without the token a release still happens, and the workflow "Rebuild the site" of the site
    repository has to be run by hand.
+5. **Allow the workflows' trigger.** From 2 December 2026 GitHub blocks `pull_request_target` in public repositories
+   unless a policy allows it, and without it nothing starts when a pull request is opened. Open Settings, then under
+   Actions choose Policies and create a policy for `.github/workflows/replay.yml` and `.github/workflows/publish.yml`
+   that allows the events `pull_request_target` and `workflow_dispatch`, with its status active.
 
 The workflow file and `scripts/replay_job.py` always come from the default branch. A pull request cannot change them
 for its own run. Changes to either go through review like any other change.
